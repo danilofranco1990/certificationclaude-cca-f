@@ -35,8 +35,15 @@ import {
 // Configuração
 // ---------------------------------------------------------------------------
 
-/** Model id. Sobrescreva com LAB_MODEL=claude-sonnet-5 para rodar mais barato. */
-const MODEL = process.env.LAB_MODEL ?? "claude-opus-5";
+/**
+ * Model id. O default é `claude-sonnet-5` porque este lab existe para ser rodado
+ * várias vezes — o que se mede aqui é a forma da orquestração, não a qualidade
+ * da prosa dos workers, e o paralelismo aparece igual nos dois modelos.
+ *
+ * Para ver saída mais próxima da qualidade real de um pipeline de pesquisa:
+ *   LAB_MODEL=claude-opus-5 npx tsx orchestrator.ts "<tópico>"
+ */
+const MODEL = process.env.LAB_MODEL ?? "claude-sonnet-5";
 
 /** Teto de gasto por chamada, como rede de segurança do lab. */
 const MAX_BUDGET_USD = Number(process.env.LAB_MAX_BUDGET_USD ?? "1.50");
@@ -258,8 +265,12 @@ async function runViaAgentTool(topic: string): Promise<void> {
   const prompt = [
     `TOPIC: ${topic}`,
     ``,
-    `Delegate to all three of these agents, in parallel, and wait for all three:`,
+    `Delegate to all three of these agents:`,
     ...LENSES.map((l) => `  - Use the ${l.id} agent for its assigned angle.`),
+    ``,
+    `You need all three answers in hand before you can write anything, so do NOT run them`,
+    `in the background and do NOT reply until every one of them has returned. Your reply must`,
+    `be the finished briefing itself — never a note saying the agents are still running.`,
     ``,
     `Then merge their three answers into ONE briefing in Portuguese (pt-BR),`,
     `keeping technical terms in English, with these sections: "Em uma frase",`,
@@ -273,27 +284,31 @@ async function runViaAgentTool(topic: string): Promise<void> {
   for await (const message of query({
     prompt,
     options: {
-      model: MODEL,
-      agents: buildAgentDefinitions(topic),
+      // Mesma configuração base do caminho A, por spread — os dois caminhos
+      // precisam compartilhar config de verdade, não por cópia manual que
+      // dessincroniza na primeira vez que BASE_OPTIONS ganhar um campo.
+      ...BASE_OPTIONS,
       // "Agent" precisa estar aqui para a delegação não pedir aprovação.
+      // Sobrescreve o `allowedTools: []` do caminho A.
       allowedTools: ["Agent"],
-      settingSources: [],
-      skills: [],
+      // O orquestrador precisa de turnos para delegar três vezes e sintetizar.
       maxTurns: 20,
-      maxBudgetUsd: MAX_BUDGET_USD,
+      agents: buildAgentDefinitions(topic),
     },
   })) {
-    // Detecção de invocação de subagent. A tool aparece como "Agent" nas
-    // versões atuais e como "Task" antes da 2.1.63 — casar os dois nomes é a
-    // recomendação da própria documentação.
-    const anyMessage = message as unknown as {
-      message?: { content?: Array<{ type?: string; name?: string; input?: { subagent_type?: string } }> };
-    };
-    for (const block of anyMessage.message?.content ?? []) {
-      if (block.type === "tool_use" && (block.name === "Agent" || block.name === "Task")) {
-        const which = block.input?.subagent_type ?? "general-purpose";
-        invoked.push(which);
-        console.log(`  → delegou para o subagent: ${which}`);
+    // Detecção de invocação de subagent, usando a união discriminada do SDK:
+    // `SDKAssistantMessage` tem `type: "assistant"` e os content blocks têm
+    // `type: "tool_use"`. A tool aparece como "Agent" nas versões atuais e como
+    // "Task" antes da 2.1.63 — casar os dois nomes é recomendação da própria
+    // documentação.
+    if (message.type === "assistant") {
+      for (const block of message.message.content) {
+        if (block.type === "tool_use" && (block.name === "Agent" || block.name === "Task")) {
+          const input = block.input as { subagent_type?: string };
+          const which = input.subagent_type ?? "general-purpose";
+          invoked.push(which);
+          console.log(`  → delegou para o subagent: ${which}`);
+        }
       }
     }
 
@@ -366,6 +381,14 @@ async function main(): Promise<void> {
   if (succeeded.length === 0) {
     console.error("Todos os workers falharam; nada a sintetizar.");
     process.exit(1);
+  }
+  if (succeeded.length < workers.length) {
+    const falhos = workers.filter((w) => !w.ok).map((w) => w.id).join(", ");
+    console.log(
+      `ATENÇÃO: ${workers.length - succeeded.length} de ${workers.length} workers falharam ` +
+        `(${falhos}). A síntese vai adiante com ${succeeded.length}, mas o briefing está ` +
+        `incompleto: o recorte que falhou não aparece em lugar nenhum do resultado.\n`,
+    );
   }
 
   // --- SÍNTESE -------------------------------------------------------------

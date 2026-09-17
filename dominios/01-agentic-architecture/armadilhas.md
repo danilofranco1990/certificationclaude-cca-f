@@ -29,8 +29,9 @@ o round-trip custa mais que o trabalho.
 > Distrator clássico: "use um subagent para não poluir o contexto principal" aplicado a uma
 > tarefa de três linhas. A poluição evitada é menor que o briefing escrito.
 
----
+> **Teoria:** ver [`notas.md`](./notas.md) §3 — Subagentes.
 
+---
 ### Execução paralela vs. sequencial
 
 **O critério:** **dependência de estado**, não tamanho nem quantidade de tarefas.
@@ -54,8 +55,9 @@ between agents are not a good fit for multi-agent systems today"*.
 > Distrator clássico: paralelizar "gerar relatório" e "revisar relatório". Revisar o que ainda
 > não existe é dependência de estado pura, e a questão vai vender isso como ganho de tempo.
 
----
+> **Teoria:** ver [`notas.md`](./notas.md) §4 — Delegação e execução paralela.
 
+---
 ### Hook vs. instrução no prompt
 
 **O critério:** **determinístico vs. probabilístico** — ou, na forma útil em prova: *qual é a
@@ -77,8 +79,9 @@ código: ele casa padrões, checa caminhos, roda validadores. "Não edite `infra
 hook — não existe script que decida isso; é `CLAUDE.md`. Tentar codificar julgamento semântico
 num hook produz falso positivo que trava o agente.
 
----
+> **Teoria:** ver [`notas.md`](./notas.md) §6 — Hooks.
 
+---
 ### Sessão nova vs. resume
 
 **O critério:** **a tarefa nova depende do que foi estabelecido antes?** Se depende, resume. Se
@@ -99,8 +102,9 @@ contexto. O inverso também cai em prova: a sessão está longa e cara, mas a ta
 mesma; a resposta é `/compact` (resumir dentro da sessão) ou fork, não começar do zero e perder
 o que já foi estabelecido.
 
----
+> **Teoria:** ver [`notas.md`](./notas.md) §2 — Sessões e continuidade.
 
+---
 ### Escalonar para humano vs. tentar de novo
 
 **O critério:** **irreversibilidade e hipótese nova** — nunca o número de tentativas.
@@ -123,8 +127,9 @@ demais transforma um soluço de rede em intervenção humana.
 > Distrator clássico: "tentou 3 vezes, agora escale". A contagem é irrelevante; o cenário terá
 > plantado ou uma irreversibilidade (escale já) ou um erro transitório (continue tentando).
 
----
+> **Teoria:** ver [`notas.md`](./notas.md) §8 — Escalonamento para humano.
 
+---
 ### `PreToolUse` vs. `PostToolUse`
 
 **O critério:** **a ação já aconteceu?** `PreToolUse` roda **antes** da tool call e pode
@@ -144,3 +149,6 @@ resultado** — formatar o arquivo recém-editado, rodar o type-checker sobre o 
 o que foi feito —, `PostToolUse` é o certo, porque `PreToolUse` não tem acesso a um resultado que
 ainda não existe. A armadilha é escolher `PostToolUse` para um gate de segurança: ele roda, ele
 loga, ele até reclama — e o dano já está feito.
+
+> **Teoria:** ver [`notas.md`](./notas.md) §6 — Hooks.
+

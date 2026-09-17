@@ -28,21 +28,6 @@ cortam também os canais indiretos: `settingSources: []` (nada de settings de us
   reaproveita essa credencial. `ANTHROPIC_API_KEY` funciona, mas **não é obrigatório**
   (verificado empiricamente: o lab rodou sem a variável definida).
 
-## Como rodar
-
-```bash
-cd dominios/01-agentic-architecture/lab
-npm install
-npx tsx orchestrator.ts "agentic RAG tradeoffs"
-```
-
-Variáveis opcionais:
-
-| Variável | Default | Para quê |
-|---|---|---|
-| `LAB_MODEL` | `claude-opus-5` | trocar o model id (ex.: `claude-sonnet-5`, bem mais barato) |
-| `LAB_MAX_BUDGET_USD` | `1.50` | teto de gasto por chamada, como rede de segurança |
-
 ## Critério de "funcionou"
 
 A execução passou se **todos** os itens abaixo aparecerem:
@@ -59,25 +44,65 @@ A execução passou se **todos** os itens abaixo aparecerem:
 O sinal mais forte é o wall clock ficar ≈ igual ao **worker mais lento**: é a assinatura de
 execução paralela. Se ele ficasse ≈ igual à **soma**, os ramos teriam rodado em série.
 
+## Como rodar
+
+```bash
+cd dominios/01-agentic-architecture/lab
+npm install
+npx tsx orchestrator.ts "agentic RAG tradeoffs"
+```
+
+Variáveis opcionais:
+
+| Variável | Default | Para quê |
+|---|---|---|
+| `LAB_MODEL` | `claude-sonnet-5` | trocar o model id. `claude-opus-5` dá saída mais próxima da qualidade real de um pipeline de pesquisa, por ~4x o custo |
+| `LAB_MAX_BUDGET_USD` | `1.50` | teto de gasto **por chamada**, como rede de segurança |
+
+### Quanto custa uma rodada
+
+`LAB_MAX_BUDGET_USD` limita **cada chamada**, não a rodada. O caminho A faz quatro chamadas
+(três workers + síntese), então o pior caso teórico de uma rodada completa é **4 × 1,50 =
+US$ 6,00**. Na prática, medido:
+
+| Rodada | Custo observado (`total_cost_usd`) |
+|---|---|
+| Caminho A, `claude-sonnet-5` (default) | US$ 0,4291 |
+| Caminho A, `claude-opus-5` | US$ 0,2760 |
+| Caminho B, `claude-sonnet-5` (default) | US$ 0,1410 |
+| Caminho B, `claude-opus-5` | US$ 0,3263 |
+
+Números de rodadas únicas, não médias. `total_cost_usd` é **estimativa**, não fatura, e varia
+bastante entre execuções — a linha do sonnet acima saiu mais cara que a do opus, o que é ruído de
+uma amostra só, não uma propriedade dos modelos. Use a tabela para ordem de grandeza (centavos a
+dezenas de centavos), não para comparar modelos.
+
+Baixe `LAB_MAX_BUDGET_USD` se quiser um teto mais apertado; o script trata o estouro como falha
+do worker, não como crash.
+
 ## Execução observada
 
-Rodada real em 2026-09-17, `claude-opus-5`, tópico `"agentic RAG tradeoffs"`:
+Rodada real em 2026-09-17, modelo default (`claude-sonnet-5`), tópico `"agentic RAG tradeoffs"`:
 
 ```
 === PROVA DO PARALELISMO ===
-  worker mecanismo                18580 ms
-  worker custos-e-falhas          20355 ms
-  worker criterios-de-decisao     15016 ms
+  worker mecanismo                14216 ms
+  worker custos-e-falhas          14387 ms
+  worker criterios-de-decisao     12400 ms
   --------------------------------------
-  soma dos workers (seria o tempo sequencial)   53951 ms
-  worker mais lento                             20355 ms
-  tempo real do fan-out (wall clock)            20602 ms
-  speedup                                     2.62x
-  custo total estimado                        $0.2827
+  soma dos workers (seria o tempo sequencial)   41003 ms
+  worker mais lento                             14387 ms
+  tempo real do fan-out (wall clock)            14416 ms
+  speedup                                     2.84x
+  custo total estimado                        $0.4291
 ```
 
-Wall clock 20 602 ms contra worker mais lento 20 355 ms: diferença de 247 ms, que é só o overhead
-de disparar e coletar. Paralelismo comprovado.
+Wall clock 14 416 ms contra worker mais lento 14 387 ms: diferença de **29 ms**, que é só o
+overhead de disparar e coletar. Paralelismo comprovado.
+
+A mesma rodada em `claude-opus-5` deu 19 420 ms de wall clock contra 56 200 ms de soma (2,89x) —
+o speedup é praticamente o mesmo, que é justamente por que o default barato não prejudica a
+demonstração.
 
 ## Os dois caminhos
 
@@ -116,7 +141,16 @@ Detalhes que o código demonstra e que valem como nota de estudo:
 - O script **conta** quantos subagents foram de fato invocados e avisa quando o modelo delega
   para menos que os três — que é exatamente a razão de o caminho A não depender disso para medir.
 
-Execução observada (2026-09-17, `claude-opus-5`):
+- **Subagents rodam em background por padrão** — e isso morde. Uma chamada da tool `Agent` que
+  omite `run_in_background` dispara um subagent em background; o modelo marca
+  `run_in_background: false` só quando precisa do resultado para continuar. Na primeira versão
+  deste lab, o orquestrador delegou os três corretamente e **respondeu sem esperar**, com um
+  "os três estão rodando em background, aviso quando terminarem" — delegação perfeita, síntese
+  vazia. A correção foi no prompt: dizer que ele precisa das três respostas em mãos antes de
+  escrever qualquer coisa, e que a resposta dele tem de ser o briefing pronto. Vale como lição
+  geral: com a tool `Agent`, *esperar* é comportamento a instruir, não default.
+
+Execução observada (2026-09-17, modelo default `claude-sonnet-5`, já com a instrução de esperar):
 
 ```
   → delegou para o subagent: mecanismo
@@ -124,7 +158,12 @@ Execução observada (2026-09-17, `claude-opus-5`):
   → delegou para o subagent: criterios-de-decisao
 
 ### SÍNTESE (produzida pelo orquestrador-modelo)
-(73824 ms · session bc577dfa-0705-45ec-87ce-ea0ef168aac4 · $0.3263)
+(52746 ms · session 32588e06-d8db-4579-a3ce-4cee5ed4e899 · $0.1410)
+
+# Briefing: Agentic RAG Tradeoffs
+## Em uma frase
+Agentic RAG transforma a recuperação de contexto de um passo fixo de pré-processamento em uma
+ação dentro de um loop de decisão do agente...
 ```
 
 ### A diferença que a prova cobra
@@ -139,6 +178,24 @@ Execução observada (2026-09-17, `claude-opus-5`):
 
 O conceito de isolamento de contexto é idêntico nos dois. O que muda é o **gatilho da delegação**
 — e é sobre o gatilho que as questões costumam girar.
+
+## Troubleshooting — "meu código está errado" vs. "o ambiente atrapalhou"
+
+O lab sai com código 1 quando o wall clock não fica abaixo da soma dos workers. Antes de mexer
+no código, separe as duas causas:
+
+| Sintoma | Provável causa | É defeito de código? |
+|---|---|---|
+| Wall clock ≈ soma dos workers, e os três tempos individuais são normais | os ramos rodaram em série | **sim** — alguém trocou `Promise.all` por `for/await` |
+| Wall clock ≈ worker mais lento, mas um worker demorou muito mais que os outros | latência de rede ou fila do provedor num dos ramos | não — rode de novo |
+| Um ou mais workers falham com `error_max_budget_usd` | `LAB_MAX_BUDGET_USD` baixo demais para o modelo escolhido | não — suba o teto ou use um modelo mais barato |
+| Todos os workers falham com erro de autenticação | não há credencial: CLI não autenticado e sem `ANTHROPIC_API_KEY` | não — rode `claude` uma vez e faça login |
+| `Reached maximum number of turns` | `maxTurns` baixo demais (o passo de *thinking* consome um turno) | **sim** |
+| Caminho B delega para menos de três agents | o modelo decidiu não delegar — o script avisa | não — é o ponto que o caminho B existe para mostrar |
+
+Regra prática: **o único sintoma que prova defeito de código é wall clock ≈ soma com tempos
+individuais normais.** Todo o resto é ambiente, e a resposta certa é rodar de novo antes de
+editar qualquer coisa.
 
 ## Detalhes de implementação que valem como nota de estudo
 

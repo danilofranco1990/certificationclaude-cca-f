@@ -122,9 +122,9 @@ relidos no launch, então configuração que mora neles não precisa ser repassa
 Entre sessões diferentes, nada do histórico atravessa. O que atravessa por outro mecanismo é o
 `CLAUDE.md` (carregado toda sessão) e a auto memory.
 
-### Quando o histórico deixa de ajudar
+### Quando usar
 
-Contexto acumulado não é neutro: ele compete por espaço na janela e dilui a atenção. Quando a
+**Quando o histórico deixa de ajudar e passa a poluir.** Contexto acumulado não é neutro: ele compete por espaço na janela e dilui a atenção. Quando a
 janela enche, o Claude Code administra sozinho, e a ordem importa:
 
 > "It clears older tool outputs first, then summarizes the conversation if needed. Your requests
@@ -252,9 +252,9 @@ problema, e sintetizar os resultados depois. É o padrão orchestrator-worker:
 > subagents to explore different aspects simultaneously."
 > — [How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system)
 
-### O teste é dependência de estado, não tamanho
+### Quando usar
 
-Duas subtarefas podem rodar em paralelo se, e somente se, **nenhuma precisa do resultado da
+**O teste é dependência de estado, não tamanho.** Duas subtarefas podem rodar em paralelo se, e somente se, **nenhuma precisa do resultado da
 outra e nenhuma escreve num estado que a outra lê**. Tamanho não entra na conta: três tarefas
 grandes e independentes paralelizam; duas tarefas minúsculas encadeadas, não.
 
@@ -306,9 +306,12 @@ revisar um relatório que ainda não existe é dependência de estado pura.
 
 ## 5. Passagem explícita de contexto
 
-### O antipadrão
+### Definição
 
-Assumir que o subagent sabe algo que só o pai sabe. Como a tabela da seção 3 mostra, o subagent
+Passagem explícita de contexto é a prática de escrever no prompt de delegação **tudo** que o
+subagent precisa saber, porque nada do contexto do pai chega até ele por outro caminho.
+
+**O antipadrão é o inverso: assumir contexto implícito.** Assumir que o subagent sabe algo que só o pai sabe. Como a tabela da seção 3 mostra, o subagent
 não recebe histórico, não recebe os arquivos já lidos e não recebe as skills já invocadas. Todo
 prompt de delegação que contenha "como discutimos", "continue de onde paramos", "o arquivo que
 acabamos de ver" ou "aplique o mesmo critério" está referenciando um contexto que **não existe**
@@ -326,9 +329,9 @@ No mesmo espírito, o campo `omitClaudeMd` é documentado como sendo "for agents
 everything they need from the delegation prompt" — a expectativa de projeto é que o prompt de
 delegação seja autossuficiente.
 
-### O que precisa estar no prompt do subagent
+### Quando usar
 
-A lista canônica da Anthropic:
+**Sempre — a pergunta útil é *o que* precisa estar no prompt do subagent.** A lista canônica da Anthropic:
 
 > "Each subagent needs an **objective**, an **output format**, **guidance on the tools and
 > sources to use**, and **clear task boundaries**."
@@ -376,9 +379,15 @@ Um **hook** é um handler configurado em `settings.json` que o Claude Code execu
   quando o modelo "esqueceu", quando o contexto foi compactado e quando o modelo tentou
   explicitamente pular o passo.
 
-Regra de decisão: se a consequência de o passo **não** acontecer é inaceitável — política de
-segurança, gate de compliance, formatação obrigatória, registro de auditoria — é hook. Se é
-preferência de estilo, é prompt (ou `CLAUDE.md`).
+### Quando usar
+
+**A pergunta é: qual é a consequência de o passo simplesmente não acontecer?** Se a consequência
+é inaceitável — política de segurança, gate de compliance, formatação obrigatória, registro de
+auditoria — é hook. Se é preferência de estilo, é prompt (ou `CLAUDE.md`).
+
+**Quando *não* usar:** quando a regra exige julgamento sobre o conteúdo. Hook é código — casa
+padrões, checa caminhos, roda validadores. "Não edite `infra/prod/`" é hook; "prefira nomes
+descritivos a abreviações" não é, porque não existe script que decida isso.
 
 ### Eventos
 
@@ -475,7 +484,16 @@ probabilística — ainda por cima sujeita a se perder na compaction. A resposta
 
 ## 7. Decomposição de tarefas
 
-### Os três critérios para quebrar
+### Definição
+
+Decomposição é quebrar uma tarefa em subtarefas que possam ser executadas — e conferidas —
+separadamente. Não é o mesmo que delegar: dá para decompor em fases sequenciais no próprio
+contexto, sem subagent nenhum. A pergunta de desenho é **onde cortar**, e é ela que os três
+critérios abaixo respondem.
+
+### Quando usar
+
+**Os três critérios para quebrar.**
 
 **1. Independência.** A subtarefa pode ser executada sem o resultado das outras? Se sim, ela é
 candidata a fan-out. Se não, ela é um estágio de pipeline sequencial — ainda pode valer a pena
@@ -493,9 +511,7 @@ onde o erro entra no sistema sem alarme.
 O terceiro critério é o mais esquecido e o mais cobrado. Decompor uma tarefa em pedaços que
 ninguém sabe conferir aumenta o número de pontos de falha sem aumentar a confiança no todo.
 
-### Quando não decompor
-
-Quando as fases compartilham muito contexto (o custo de repassar o contexto supera o ganho),
+**Quando *não* decompor.** Quando as fases compartilham muito contexto (o custo de repassar o contexto supera o ganho),
 quando a tarefa é pequena, e quando o resultado de cada pedaço não é verificável de forma
 independente. Decomposição tem custo fixo: escrever briefing autossuficiente, pagar round-trip,
 sintetizar. Abaixo de certo tamanho, o custo fixo domina.
@@ -514,7 +530,13 @@ sendo o único pedaço que cabe em fan-out.
 
 ## 8. Escalonamento para humano
 
-### Os quatro gatilhos
+### Definição
+
+Escalonamento é interromper a execução automática e devolver a decisão a um humano. Não é
+"desistir": é reconhecer que a decisão seguinte não é do agente. O que separa um escalonamento
+bom de um ruim é se o humano recebe um pacote pronto para decidir ou um "não consegui".
+
+**Os quatro gatilhos.**
 
 | Gatilho | O que é | Por que o agente não resolve sozinho |
 |---|---|---|
@@ -523,9 +545,10 @@ sendo o único pedaço que cabe em fan-out.
 | **Conflito de requisitos** | Duas instruções válidas se contradizem | Escolher uma é **decidir pelo usuário**, não executar por ele |
 | **Falha repetida** | A mesma abordagem falhou de novo | O agente está sem hipótese nova; repetir só gasta tokens |
 
-### O critério que separa escalar de tentar de novo
+### Quando usar
 
-Não é o número de tentativas. São duas perguntas:
+**O critério que separa escalar de tentar de novo não é o número de tentativas.** São duas
+perguntas:
 
 1. **A ação é reversível?** Se não é, escale **antes** da primeira tentativa. Três tentativas de
    apagar a base de produção não são melhores que uma.
