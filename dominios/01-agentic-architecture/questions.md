@@ -83,8 +83,9 @@ D. All four, since each stage is handled by a specialized agent with its own con
 ### Question 5
 
 An orchestrator fans out five subagents to research a market segment. Each subagent receives the
-topic, a clear objective, the list of approved sources, and the required output format. The five
-responses come back well written — and nearly identical, all covering the same sub-topic.
+topic, the same objective ("research this market segment"), the list of approved sources, and the
+required output format. The five responses come back well written — and nearly identical, all
+covering the same sub-topic.
 
 What should the architect change?
 
@@ -125,9 +126,10 @@ What is the strongest objection to this plan?
 
 A. Six concurrent subagents exceeds Claude Code's default concurrency limit, so the spawns will
    fail.
-B. Subagents cannot modify files, so none of the six could perform its part of the migration.
-C. Multi-agent systems use roughly 15× the tokens of a single agent, and the migration does not
-   justify that cost.
+B. Each subagent starts with a fresh context and would have to rediscover the existing
+   authentication call sites, so the same investigation is duplicated six times.
+C. Multi-agent systems use roughly 15× the tokens of a plain chat interaction, and the migration
+   does not justify that cost.
 D. The six parts touch the same code and the same schema, and "migrated correctly" is only
    verifiable with the whole system running — so the parts are neither independent nor
    independently verifiable.
@@ -156,17 +158,18 @@ D. Retry the decision with a clarifying prompt that asks the model to weigh the 
 ### Question 9
 
 A finance team needs to pull the invoice number, issue date, and total from 50,000 scanned
-invoices. The vendor's invoice layout is consistent, every extracted record is validated against
-a JSON Schema, and records that fail validation are routed to a human queue.
+invoices. The vendor's invoice layout is consistent across all of them, and the team already
+staffs a small queue of humans who handle exceptions.
 
 Which architecture fits this workload?
 
 A. An orchestrator that fans out one subagent per invoice field, then merges the three results.
-B. A single structured-output call per invoice, with schema validation and the existing human
-   queue for failures — no agentic loop.
-C. An agentic loop per invoice, so the agent can verify its own extraction and retry when a
-   field looks wrong.
-D. A multi-agent pipeline with a reader agent, an extractor agent, and a reviewer agent.
+B. A single structured-output call per invoice, validated against a JSON Schema, with records
+   that fail validation routed to the existing human queue.
+C. An agentic loop per invoice that re-reads the document and retries until the agent is
+   confident in all three fields.
+D. A multi-agent pipeline with a reader agent, an extractor agent, and a reviewer agent that
+   cross-checks the extractor's output.
 
 ---
 
@@ -262,7 +265,8 @@ D. `SubagentStop`, which fires when a subagent finishes.
 
 A content team decomposes "improve the product onboarding copy" into five subagents, each
 rewriting one section. The orchestrator concatenates the five rewrites and ships the result.
-Quality is inconsistent and nobody can say which sections got worse.
+Nobody on the team can say whether any individual rewrite improved on the original or made it
+worse.
 
 Which decomposition criterion did this plan violate?
 
@@ -303,7 +307,7 @@ What is the right move?
 
 A. Run `/compact` with a focus instruction naming the decisions that must survive.
 B. Start a fresh session and restate the decisions from memory.
-C. Resume the session with `claude --continue` to reset the accumulated cost.
+C. Switch to a smaller, cheaper model with `/model` so each request costs less.
 D. Fork the session with `--fork-session`, since the fork starts with a smaller context.
 
 ---
@@ -312,14 +316,15 @@ D. Fork the session with `--fork-session`, since the fork starts with a smaller 
 
 An agent was changed to delegate every file read to a subagent, on the theory that keeping file
 contents out of the main context would speed things up. Most files are under 100 lines. End-to-
-end latency got substantially worse, and cost went up.
+end latency got substantially worse, even though the main context stayed smaller than before.
 
 What explains this?
 
 A. The subagents exceeded the default nesting depth limit and were silently retried.
 B. A subagent that is not a fork starts fresh and must gather its own context, so the round-trip
    costs more than the small read it replaces.
-C. Subagents cannot use the `Read` tool, so each one fell back to shelling out, which is slower.
+C. The subagents inherited the parent's model, so each small read ran on the same large model the
+   parent uses.
 D. Each subagent returned a full summary of the file, so the parent's context grew faster than
    if it had read the files directly.
 
@@ -330,7 +335,7 @@ D. Each subagent returned a full summary of the file, so the parent's context gr
 A team had strong results using an orchestrator that fans out research subagents across
 independent sources. They applied the same pattern to a code refactor: six subagents, each
 refactoring one part of the same module, merged at the end. Results were worse than a single
-agent doing the refactor sequentially, at roughly 15× the token cost.
+agent doing the refactor sequentially, at roughly 15× the token cost of a chat interaction.
 
 What explains the difference between the two applications of the pattern?
 
@@ -427,7 +432,9 @@ produz.
 
 **Por que C:** ao worker faltou a **fronteira da tarefa**. A lista canônica da Anthropic para um
 subagent é *"an objective, an output format, guidance on the tools and sources to use, and clear
-task boundaries"* — o cenário entrega os três primeiros e omite o quarto. A falha documentada é
+task boundaries"* — o cenário entrega fontes e formato, entrega um objetivo que é **o mesmo para
+os cinco**, e omite por completo o quarto item. Objetivo idêntico sem fronteira é a receita de
+cinco workers escolhendo o mesmo recorte. A falha documentada é
 literalmente esta: *"one subagent explored the 2021 automotive chip crisis while 2 others
 duplicated work investigating current 2025 supply chains, without an effective division of
 labor."* Cada worker precisa do próprio recorte **e** de saber o que os outros cobrem.
@@ -467,11 +474,15 @@ premissas.
 
 - **A (limite de concorrência):** factualmente errado, e é a pegadinha para quem meio-lembra o
   número. O padrão do Claude Code é **20** subagents concorrentes; seis passa com folga.
-- **B (subagents não editam arquivos):** falso. Subagents têm ferramentas próprias e podem
-  receber `Edit`/`Write`.
-- **C (15× tokens):** o número está certo (sistemas multiagente usam ~15× os tokens de um chat),
-  mas custo é a objeção **mais fraca** aqui. Se o desenho fosse válido, 15× poderia ser aceitável
-  numa migração; o que condena o plano é ele não funcionar, não ele ser caro.
+- **B (cada subagent redescobre as call sites):** o mecanismo é **verdadeiro** — um subagent que
+  não é fork começa com contexto limpo e precisa se situar. Mas é uma objeção de *eficiência*, e
+  tem conserto barato: passar as call sites já levantadas no prompt de delegação. D aponta um
+  problema de *correção*, que nenhum prompt melhor resolve. Distrator forte justamente porque não
+  é falso — é insuficiente.
+- **C (15× tokens):** o número está certo (sistemas multiagente usam ~15× os tokens de um **chat**;
+  contra um agente único, que já gasta ~4× o chat, a razão é ≈3,75×), mas custo é a objeção **mais
+  fraca** aqui. Se o desenho fosse válido, 15× poderia ser aceitável numa migração; o que condena
+  o plano é ele não funcionar, não ele ser caro.
 
 ### Q8 — A
 
@@ -493,17 +504,19 @@ vez de perguntar "o que eu faço?".
 
 ### Q9 — B
 
-**Por que B:** a tarefa não pede agente. O layout é consistente, a saída é validada por schema, e
-já existe fila humana para os casos que falham. É trabalho de chamada única com saída estruturada
-— exatamente o caso em que a Anthropic recomenda não escalar: *"For many applications, however,
+**Por que B:** a tarefa não pede agente. Layout consistente, três campos fixos e uma fila humana
+já existente para exceções — é trabalho de chamada única com saída estruturada, mais um
+verificador **externo e determinístico** (o schema) para decidir o que vai para o humano.
+Exatamente o caso em que a Anthropic recomenda não escalar: *"For many applications, however,
 optimizing single LLM calls with retrieval and in-context examples is usually enough."* Agente se
 justifica quando a tarefa é multi-passo e não totalmente especificável de antemão; nada aqui é.
 
 - **A (um subagent por campo):** três round-trips para extrair três campos do mesmo documento
   curto. O custo fixo da delegação domina, e o documento teria de ser passado a cada um.
-- **C (loop agêntico por nota):** a verificação já existe e é externa e determinística (o
-  validador de schema mais a fila humana). Acrescentar auto-verificação do agente troca um
-  critério objetivo por um julgamento do modelo, em 50 mil documentos.
+- **C (loop agêntico por nota):** substitui um critério objetivo por um subjetivo. "Até o agente
+  estar confiante" é auto-relato, e confiança declarada não é acurácia — em 50 mil documentos,
+  isso troca uma barreira determinística por uma que o próprio agente decide quando baixar. Além
+  disso, sem um schema, não há como saber quando o loop deveria parar.
 - **D (pipeline de três agentes):** três agentes para uma extração de layout fixo. Cada fronteira
   entre agentes é uma passagem de contexto a mais e um ponto de falha a mais, sem nenhum ganho de
   qualidade a comprar.
@@ -596,8 +609,9 @@ fossem trabalho concluído. O sintoma no cenário é a assinatura disso: *ningu�
 seções pioraram*.
 
 - **A (independência):** é o critério que este plano até **atende** razoavelmente — cinco seções
-  distintas de um documento podem ser reescritas sem que uma dependa do texto da outra. Pode
-  haver problema de tom entre seções, mas não é o que o cenário descreve.
+  distintas podem ser reescritas sem que uma dependa do texto da outra, e a afirmação de que
+  "não podem ser trabalhadas separadamente" é forte demais. O cenário não relata um defeito de
+  coordenação entre seções; relata a impossibilidade de **avaliar** qualquer uma delas.
 - **C (tamanho de contexto):** cinco seções de copy de onboarding são pequenas. O custo de
   contexto não é o que está causando a inconsistência de qualidade.
 - **D (concorrência):** cinco está muito abaixo do limite padrão de 20 subagents concorrentes, e
@@ -630,8 +644,11 @@ reduz custo por request e preserva as decisões.
 
 - **B (sessão nova):** cumpre a metade barata do requisito e falha na outra. Recomeçar descarta as
   decisões, e reconstruí-las de memória é justamente o que ela quer evitar.
-- **C (`--continue`):** não faz sentido dentro de uma sessão já aberta, e resume não "zera" custo:
-  reabre sob o mesmo id e anexa turnos ao mesmo histórico, que continua sendo reenviado.
+- **C (modelo menor):** o distrator mais tentador, porque de fato reduz o preço por token e
+  preserva as decisões. Mas ataca o sintoma, não a causa: o custo de uma sessão longa sobe porque
+  **o histórico inteiro é reenviado a cada request**, e trocar de modelo não encolhe o histórico.
+  A conta continua crescendo, só que com outro multiplicador — e ainda se paga com um modelo
+  menos capaz numa tarefa arquitetural em andamento.
 - **D (fork):** fork **copia** o histórico para um id novo. A nova sessão começa com o mesmo
   volume de contexto — nenhuma economia — e a premissa da alternativa ("o fork começa com menos
   contexto") é falsa.
@@ -647,13 +664,15 @@ entra e pouco sai; aqui entra pouco e sai pouco.
 - **A (limite de aninhamento):** o limite padrão é de 3 camadas abaixo da conversa principal, e o
   cenário descreve um único nível de delegação. Além disso, atingir o limite não gera retry
   silencioso.
-- **C (subagents não usam `Read`):** falso. Subagents têm ferramentas próprias e `Read` está entre
-  as que podem receber.
-- **D (resumos incharam o contexto):** o distrator plausível, e o efeito é real em outros
-  cenários — muitos subagents devolvendo muito conteúdo consomem contexto significativo. Mas não
-  explica **este** caso: arquivos pequenos geram resumos pequenos, e o desenho existia justamente
-  para reduzir o contexto do pai. O que piorou foi a latência, e latência é explicada pelo
-  round-trip de partida, não pelo tamanho do retorno.
+- **C (herdaram o modelo do pai):** o mecanismo é verdadeiro — um subagent sem `model` definido
+  roda no modelo do pai. Mas isso não explica nada: se o pai lesse o arquivo diretamente, usaria
+  **o mesmo modelo**. Um fator que é idêntico nos dois desenhos não pode explicar a diferença
+  entre eles. Distrator que sobrevive à leitura rápida e morre na comparação.
+- **D (resumos incharam o contexto):** o efeito é real em outros cenários — muitos subagents
+  devolvendo muito conteúdo consomem contexto significativo. Mas o cenário fecha essa porta
+  explicitamente: o contexto principal **ficou menor** do que antes. O desenho entregou a
+  economia de contexto que prometia; o que ele não entregou foi latência, e latência se explica
+  pelo round-trip de partida.
 
 ### Q19 — C
 

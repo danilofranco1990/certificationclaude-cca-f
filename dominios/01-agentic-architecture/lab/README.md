@@ -79,22 +79,66 @@ Rodada real em 2026-09-17, `claude-opus-5`, tópico `"agentic RAG tradeoffs"`:
 Wall clock 20 602 ms contra worker mais lento 20 355 ms: diferença de 247 ms, que é só o overhead
 de disparar e coletar. Paralelismo comprovado.
 
-## Nota honesta sobre o mecanismo
+## Os dois caminhos
 
-O script usa **três chamadas `query()` concorrentes do Agent SDK**, não a tool `Agent` (o
-mecanismo de subagent do Claude Code, renomeado de `Task` na versão 2.1.63). A escolha é
-deliberada:
+O lab implementa os **mesmos três recortes** de duas formas, porque cada uma ensina metade do
+assunto.
 
-- Um subagent invocado pela tool `Agent` só é disparado **se o modelo orquestrador decidir
-  disparar**. Isso é não-determinístico e impossível de cronometrar ramo a ramo — justamente o
-  que o lab precisa medir.
-- Três `query()` concorrentes dão o mesmo isolamento de contexto que interessa ao domínio (cada
-  um com sessão, janela e system prompt próprios), de forma determinística e instrumentável.
+### Caminho A (padrão) — três `query()` concorrentes
 
-A diferença que **não** deve ser esquecida na prova: com a tool `Agent`, é o modelo que decide
-delegar, e o resultado volta como resumo para a janela do pai; aqui, quem decide é o código, e
-quem cola o resultado no próximo prompt é o orquestrador. O conceito de isolamento é o mesmo; o
-gatilho da delegação é que muda.
+```bash
+npx tsx orchestrator.ts "agentic RAG tradeoffs"
+```
+
+Quem decide delegar é o **código**. Determinístico, cronometrável ramo a ramo, e por isso é o
+caminho que produz a prova de paralelismo acima. Cada `query()` é uma sessão própria, com janela
+e system prompt próprios — o isolamento de contexto que interessa ao domínio.
+
+### Caminho B — subagents de verdade, via `options.agents` e a tool `Agent`
+
+```bash
+npx tsx orchestrator.ts "agentic RAG tradeoffs" --via-agent-tool
+```
+
+Aqui aparece a superfície que a prova cobra: `options.agents` como
+`Record<string, AgentDefinition>`, com `description`, `prompt`, `tools`, `model` e `maxTurns`; e
+a delegação acontecendo pela tool **`Agent`**, decidida pelo modelo.
+
+Detalhes que o código demonstra e que valem como nota de estudo:
+
+- **`allowedTools` precisa conter `"Agent"`**, senão cada delegação pede aprovação.
+- **O prompt nomeia os três agents explicitamente** ("Use the *mecanismo* agent…"). A
+  documentação chama isso de *explicit invocation*, e ela é necessária porque, com Opus 5 sob o
+  system prompt preset do Claude Code, o harness instrui o modelo a **não** chamar a tool `Agent`
+  a menos que seja pedido.
+- **Detecção de delegação** casa `"Agent"` **e** `"Task"` no `tool_use`: a tool foi renomeada na
+  versão 2.1.63 e o nome antigo ainda aparece em versões e listagens mais velhas.
+- O script **conta** quantos subagents foram de fato invocados e avisa quando o modelo delega
+  para menos que os três — que é exatamente a razão de o caminho A não depender disso para medir.
+
+Execução observada (2026-09-17, `claude-opus-5`):
+
+```
+  → delegou para o subagent: mecanismo
+  → delegou para o subagent: custos-e-falhas
+  → delegou para o subagent: criterios-de-decisao
+
+### SÍNTESE (produzida pelo orquestrador-modelo)
+(73824 ms · session bc577dfa-0705-45ec-87ce-ea0ef168aac4 · $0.3263)
+```
+
+### A diferença que a prova cobra
+
+| | Caminho A | Caminho B |
+|---|---|---|
+| Quem decide delegar | o código | o **modelo** |
+| Mecanismo | `query()` concorrentes | tool `Agent` + `options.agents` |
+| Como o resultado volta | o orquestrador cola no próximo prompt | volta como resultado da tool para a janela do pai |
+| Paralelismo | garantido por `Promise.all` | decisão do modelo (subagents rodam em background por padrão) |
+| Cronometrável ramo a ramo | sim | não |
+
+O conceito de isolamento de contexto é idêntico nos dois. O que muda é o **gatilho da delegação**
+— e é sobre o gatilho que as questões costumam girar.
 
 ## Detalhes de implementação que valem como nota de estudo
 

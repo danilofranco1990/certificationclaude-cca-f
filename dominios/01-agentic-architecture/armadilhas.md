@@ -133,8 +133,10 @@ existe no mundo.
 
 Bloqueio: exit **2** barra a ação, e vence qualquer JSON em contrário (*"Even a JSON
 `permissionDecision` of `allow` cannot override exit 2"*). Em `PreToolUse` também é possível
-decidir por JSON, com `hookSpecificOutput.permissionDecision` em `allow` / `deny` / `request`.
-Exit 0 não bloqueia, e outros códigos não bloqueiam por si.
+decidir por JSON, com `hookSpecificOutput.permissionDecision` em **`allow` / `deny` / `ask`** —
+mais `defer`, que existe só em modo não-interativo com `-p`. Atenção ao terceiro valor: é
+**`ask`**, não `request`. Entre hooks concorrentes vence o mais restritivo, na ordem `deny` →
+`defer` → `ask` → `allow`. Exit 0 não bloqueia, e outros códigos não bloqueiam por si.
 
 **Onde a escolha se inverte:** para **prevenir**, só `PreToolUse` serve — em `PostToolUse` o
 arquivo já foi escrito, o e-mail já saiu, o registro já foi apagado. Mas para **reagir ao

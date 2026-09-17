@@ -23,11 +23,13 @@ ferramentas**. A documentação oficial do Claude Code descreve o ciclo em três
 
 O diagrama que acompanha o texto fecha o ciclo: *gathering context, taking action, verifying
 results, and repeating until task complete*. Daí a forma curta usada no repositório:
-**gather context → take action → verify work → repeat**.
+**gather context → take action → verify results → repeat**.
 
-> **Nota de terminologia.** O glossário deste repositório registra a terceira fase como
-> *verify work*; a documentação oficial escreve *verify results*. É a mesma fase — se a prova
-> citar uma das duas formas, é do mesmo passo que se trata.
+> **Nota de terminologia.** A forma oficial é **verify results** — é a que aparece na
+> documentação, e é a que este repositório adota. *Verify work* é uma variante informal que
+> circula em material de terceiros e **não aparece em nenhum lugar da documentação oficial**.
+> Se a prova usar a forma informal, trata-se do mesmo passo; mas se duas alternativas
+> competirem pela redação da fase, a que casa com a documentação é *verify results*.
 
 A distinção formal que a Anthropic usa para separar agente de pipeline:
 
@@ -110,8 +112,12 @@ recente do diretório atual; `--resume` abre um seletor (ou aceita um nome/id/ca
 Persiste no resume: histórico completo (incluindo tool calls e resultados), modelo, checkpoints
 e snapshots de arquivo para `/rewind`.
 
-**Não** persiste: flags de configuração passadas na invocação (`--mcp-config`, `--settings`,
-`--add-dir`, `--fallback-model`) — precisam ser passadas de novo — e tasks de background.
+**Não** persiste: flags de configuração passadas na invocação. Se a sessão dependia de
+`--mcp-config`, `--settings`, `--plugin-dir`, `--fallback-model` ou de diretórios adicionados com
+`--add-dir`, é preciso passá-las de novo; diretórios adicionados no meio da sessão com `/add-dir`
+também não são restaurados. Os arquivos de settings (`settings.json`, `settings.local.json`) são
+relidos no launch, então configuração que mora neles não precisa ser repassada. Quanto a tasks:
+*scheduled tasks* que não expiraram **são** restauradas; **background Bash e monitor tasks não**.
 
 Entre sessões diferentes, nada do histórico atravessa. O que atravessa por outro mecanismo é o
 `CLAUDE.md` (carregado toda sessão) e a auto memory.
@@ -165,8 +171,16 @@ Material mais antigo — e possivelmente a prova — ainda diz `Task`. É a mesm
 Não é "paralelismo" nem "especialização": é que o trabalho sujo do subagent **não entra na
 janela do pai**.
 
-> "A subagent starts fresh unless it's a fork... Either way, the subagent's tool calls stay out
-> of your context, and Claude gets back a summary when the subagent finishes."
+> "Each subagent starts with a fresh, isolated context window. It doesn't see your conversation
+> history, the skills you've already invoked, or the files Claude has already read. The exception
+> is a fork, which inherits the parent conversation instead of starting fresh."
+> — [Subagents](https://code.claude.com/docs/en/sub-agents)
+
+E, do lado do SDK, o que atravessa de volta para o pai:
+
+> "intermediate tool calls and results stay inside the subagent; only its final message returns
+> to the parent."
+> — [Subagents in the SDK](https://code.claude.com/docs/en/agent-sdk/subagents)
 
 E, quantificado:
 
@@ -301,8 +315,16 @@ acabamos de ver" ou "aplique o mesmo critério" está referenciando um contexto 
 do outro lado. O subagent não erra com erro: ele preenche a lacuna com uma suposição plausível e
 segue em frente com confiança.
 
-A própria SDK documenta o campo `omitClaudeMd` como sendo "for agents that take everything they
-need from the delegation prompt" — a expectativa de projeto é que o prompt seja autossuficiente.
+A documentação do SDK é literal sobre o único canal que existe:
+
+> "The only content you pass from parent to subagent is the Agent tool's prompt string, so
+> include any file paths, error messages, or decisions the subagent needs directly in that
+> prompt."
+> — [Subagents in the SDK](https://code.claude.com/docs/en/agent-sdk/subagents)
+
+No mesmo espírito, o campo `omitClaudeMd` é documentado como sendo "for agents that take
+everything they need from the delegation prompt" — a expectativa de projeto é que o prompt de
+delegação seja autossuficiente.
 
 ### O que precisa estar no prompt do subagent
 
@@ -410,11 +432,27 @@ Como o hook decide o destino da ação:
   informação que Claude vê.
 - **Exit 2** — **bloqueia** a ação. É o código de bloqueio, e ele vence: *"Even a JSON
   `permissionDecision` of `allow` cannot override exit 2."* Nem todo evento é bloqueável.
-- **Outros códigos** — não bloqueiam por si; o stderr vai para o debug log.
+- **Outros códigos** — não bloqueiam por si. A ação segue como *non-blocking error*: o transcript
+  mostra um aviso `<hook name> hook error` seguido da primeira linha do stderr prefixada por
+  `Failed with non-blocking status code:` (o stderr completo só aparece no debug log).
 
 Em `PreToolUse` o hook também pode devolver JSON em stdout com
-`hookSpecificOutput.permissionDecision` (`allow` / `deny` / `request`) para decidir sem depender
-do exit code.
+`hookSpecificOutput.permissionDecision` — e este é o enum a decorar:
+
+| Valor | Efeito |
+|---|---|
+| `allow` | Pula o prompt interativo de permissão. Regras de `deny`/`ask`, incluindo deny lists gerenciadas pela organização, continuam valendo |
+| `deny` | Cancela a tool call e devolve `permissionDecisionReason` para Claude |
+| `ask` | Mostra o prompt de permissão ao usuário, normalmente |
+| `defer` | **Só em modo não-interativo, com `-p`.** Encerra o processo preservando a tool call, para um wrapper do Agent SDK coletar input e retomar |
+
+Duas pegadinhas aqui. A primeira: o terceiro valor é **`ask`**, não `request` — é o erro de
+memorização mais provável do tópico. A segunda: quando vários hooks respondem, vence a resposta
+**mais restritiva**, na ordem `deny` → `defer` → `ask` → `allow`.
+
+E o fato que fecha questões de segurança: *"A hook that returns `permissionDecision: "deny"`
+blocks the tool even in `bypassPermissions` mode or with `--dangerously-skip-permissions`."* O
+hook é a única camada que o usuário não contorna trocando de permission mode.
 
 ### Onde configurar
 

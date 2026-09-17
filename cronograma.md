@@ -7,7 +7,7 @@ disso, o domínio não é dado por encerrado e volta como prioridade na revisão
 
 ## Semana 1 — Domínio 1: Agentic Architecture & Orchestration (parte 1) (Task 2 do plano)
 
-- **Foco:** anatomia do loop agêntico (gather context → take action → verify work → repeat),
+- **Foco:** anatomia do loop agêntico (gather context → take action → verify results → repeat),
   sessões e continuidade, subagentes e isolamento de contexto, delegação e execução paralela.
 - **Artefatos a produzir:** primeira metade de `dominios/01-agentic-architecture/notas.md`
   (subtópicos 1–4 do syllabus do domínio).

@@ -7,7 +7,7 @@ Tabela ordenada por Domínio e, dentro de cada domínio, alfabeticamente pelo te
 
 | Termo (EN) | Definição (PT) | Domínio |
 |---|---|---|
-| agentic loop | O ciclo *gather context → take action → verify work → repeat* que caracteriza um agente, em oposição a uma única chamada ao modelo. A etapa de verificação é o que distingue um agente de uma completion isolada. | 1 |
+| agentic loop | O ciclo *gather context → take action → verify results → repeat* que caracteriza um agente, em oposição a uma única chamada ao modelo. A etapa de verificação é o que distingue um agente de uma completion isolada. | 1 |
 | fan-out | Padrão de disparar múltiplos subagents em paralelo, cada um com um recorte independente do problema, para depois sintetizar os resultados. Só é seguro quando as subtarefas não compartilham estado mutável. | 1 |
 | hook | Script determinístico configurado em `settings.json` que o Claude Code executa automaticamente em um ponto fixo do ciclo de vida (ex.: `PreToolUse`, `PostToolUse`, `SessionStart`, `Stop`). Roda sempre, independentemente do que o modelo decidir — ao contrário de uma instrução em prompt, que é probabilística. | 1 |
 | human escalation | Ato de interromper a execução automática e devolver a decisão a um humano, disparado por gatilhos como baixa confiança, ação irreversível, conflito de requisitos ou falha repetida. Deve preservar o estado acumulado para que o humano não precise recomeçar do zero. | 1 |

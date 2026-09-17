@@ -25,7 +25,11 @@
  *   npx tsx orchestrator.ts "agentic RAG tradeoffs"
  */
 
-import { query, type Options } from "@anthropic-ai/claude-agent-sdk";
+import {
+  query,
+  type AgentDefinition,
+  type Options,
+} from "@anthropic-ai/claude-agent-sdk";
 
 // ---------------------------------------------------------------------------
 // Configuração
@@ -203,15 +207,132 @@ async function runIsolated(
 }
 
 // ---------------------------------------------------------------------------
+// CAMINHO B — os mesmos três recortes como subagents de verdade (`agents`)
+// ---------------------------------------------------------------------------
+
+/**
+ * O caminho principal deste lab usa três `query()` concorrentes, porque isso é
+ * determinístico e cronometrável. Mas a prova pergunta sobre o mecanismo de
+ * subagent do Claude Code, não sobre `Promise.all` — então aqui estão os MESMOS
+ * três recortes expressos na superfície real do SDK: `options.agents`, um
+ * `Record<string, AgentDefinition>`, invocados pelo modelo através da tool
+ * `Agent`.
+ *
+ * Diferenças que valem como nota de estudo:
+ *
+ *  - Quem decide delegar é o MODELO, não o código. Por isso o prompt nomeia os
+ *    três agents explicitamente ("Use the X agent..."): a documentação chama isso
+ *    de explicit invocation, e ela é necessária aqui porque, com Opus 5 sob o
+ *    system prompt preset do Claude Code, o harness instrui o modelo a não
+ *    chamar a tool `Agent` a menos que seja pedido.
+ *  - `allowedTools` precisa conter `"Agent"`, senão a delegação pede aprovação.
+ *  - O paralelismo passa a ser decisão do modelo: subagents rodam em background
+ *    por padrão, e o modelo marca `run_in_background: false` quando precisa do
+ *    resultado antes de continuar.
+ *  - Só a mensagem final de cada subagent volta ao pai; as tool calls
+ *    intermediárias ficam dentro dele.
+ */
+function buildAgentDefinitions(topic: string): Record<string, AgentDefinition> {
+  const entries = LENSES.map((lens) => [
+    lens.id,
+    {
+      // `description` é o que o modelo lê para decidir quando usar este agent.
+      description: `Covers the "${lens.id}" angle of a technical topic. ${lens.assignment}`,
+      // `prompt` é o system prompt do subagent — o papel dele.
+      prompt: `${lens.role}\n\n${buildWorkerPrompt(topic, lens)}`,
+      // Sem ferramentas: mesma razão do caminho A.
+      tools: [],
+      model: MODEL,
+      maxTurns: 4,
+    } satisfies AgentDefinition,
+  ]);
+
+  return Object.fromEntries(entries) as Record<string, AgentDefinition>;
+}
+
+async function runViaAgentTool(topic: string): Promise<void> {
+  console.log(`\n=== CAMINHO B: subagents via a tool \`Agent\` ===`);
+  console.log(`Tópico : ${topic}`);
+  console.log(`Agents : ${LENSES.map((l) => l.id).join(", ")}\n`);
+
+  const prompt = [
+    `TOPIC: ${topic}`,
+    ``,
+    `Delegate to all three of these agents, in parallel, and wait for all three:`,
+    ...LENSES.map((l) => `  - Use the ${l.id} agent for its assigned angle.`),
+    ``,
+    `Then merge their three answers into ONE briefing in Portuguese (pt-BR),`,
+    `keeping technical terms in English, with these sections: "Em uma frase",`,
+    `"Pontos de concordância", "Tensões", "Veredito". Carry over anything a`,
+    `subagent marked "UNCERTAIN:" as an explicit caveat.`,
+  ].join("\n");
+
+  const startedAt = Date.now();
+  const invoked: string[] = [];
+
+  for await (const message of query({
+    prompt,
+    options: {
+      model: MODEL,
+      agents: buildAgentDefinitions(topic),
+      // "Agent" precisa estar aqui para a delegação não pedir aprovação.
+      allowedTools: ["Agent"],
+      settingSources: [],
+      skills: [],
+      maxTurns: 20,
+      maxBudgetUsd: MAX_BUDGET_USD,
+    },
+  })) {
+    // Detecção de invocação de subagent. A tool aparece como "Agent" nas
+    // versões atuais e como "Task" antes da 2.1.63 — casar os dois nomes é a
+    // recomendação da própria documentação.
+    const anyMessage = message as unknown as {
+      message?: { content?: Array<{ type?: string; name?: string; input?: { subagent_type?: string } }> };
+    };
+    for (const block of anyMessage.message?.content ?? []) {
+      if (block.type === "tool_use" && (block.name === "Agent" || block.name === "Task")) {
+        const which = block.input?.subagent_type ?? "general-purpose";
+        invoked.push(which);
+        console.log(`  → delegou para o subagent: ${which}`);
+      }
+    }
+
+    if (message.type === "result") {
+      console.log(`\n### SÍNTESE (produzida pelo orquestrador-modelo)`);
+      console.log(
+        `(${Date.now() - startedAt} ms · session ${message.session_id} · $${message.total_cost_usd.toFixed(4)})\n`,
+      );
+      console.log(message.subtype === "success" ? message.result : `[FALHOU: ${message.subtype}]`);
+      console.log(`\nSubagents invocados: ${invoked.length ? invoked.join(", ") : "nenhum"}`);
+      if (invoked.length < LENSES.length) {
+        console.log(
+          `ATENÇÃO: o modelo delegou para ${invoked.length} de ${LENSES.length}. ` +
+            `Delegação é decisão do modelo — é exatamente por isso que o caminho A ` +
+            `não depende dela para medir paralelismo.`,
+        );
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Orquestração
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  const topic = process.argv.slice(2).join(" ").trim();
+  const argv = process.argv.slice(2);
+  const viaAgentTool = argv.includes("--via-agent-tool");
+  const topic = argv.filter((a) => a !== "--via-agent-tool").join(" ").trim();
+
   if (!topic) {
-    console.error('Uso: npx tsx orchestrator.ts "<tópico>"');
+    console.error('Uso: npx tsx orchestrator.ts "<tópico>" [--via-agent-tool]');
     console.error('Ex.: npx tsx orchestrator.ts "agentic RAG tradeoffs"');
     process.exit(2);
+  }
+
+  if (viaAgentTool) {
+    await runViaAgentTool(topic);
+    return;
   }
 
   console.log(`\n=== ORQUESTRADOR COM FAN-OUT ===`);
