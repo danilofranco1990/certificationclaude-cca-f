@@ -10,6 +10,10 @@
 
 **Convenção de verificação:** artefatos de conteúdo são verificados por critério objetivo (contagem, presença de seção, formato). Labs são verificados por comando executável com saída esperada.
 
+**Convenção de progresso (vale para todas as tasks):** ao fechar qualquer task, antes do commit, marque as células correspondentes na tabela de progresso do `README.md` e reescreva a seção "Próximo passo" apontando a próxima task. `README.md` entra no commit da própria task. Isso não é repetido em cada task abaixo de propósito — é uma regra única para não haver duas fontes de verdade.
+
+**Fonte de verdade dos pesos:** a tabela do `README.md`. Os percentuais nos títulos das tasks e a distribuição de questões dos simulados (Tasks 8 e 9) são **derivados** dela. Se o Exam Guide oficial trouxer pesos diferentes, atualize o `README.md` primeiro e recalcule a distribuição dos simulados a partir dele.
+
 ---
 
 ### Task 1: Scaffolding do repositório
@@ -435,7 +439,7 @@ git commit -m "feat: projeto integrador multiagente com MCP, saida estruturada e
 
 - [ ] **Step 1: Montar `simulado-01.md`**
 
-60 questões **em inglês**, distribuídas pelo peso real da prova: 16 do domínio 1, 12 do 2, 12 do 3, 11 do 4, 9 do 5. Questões novas, não reaproveitadas dos bancos de domínio. Cabeçalho `### Question N`. Instruções de prova no topo: cronometrado, sem consulta, resposta única. Gabarito em seção separada ao final, após um marcador `<!-- GABARITO -->` para permitir esconder na primeira leitura.
+60 questões **em inglês**, distribuídas pelo peso real da prova: 16 do domínio 1, 12 do 2, 12 do 3, 11 do 4, 9 do 5. **Esses números são derivados da tabela de pesos do `README.md`** (27/20/20/18/15% × 60, arredondado) — se os pesos mudarem quando o Exam Guide oficial chegar, recalcule esta distribuição antes de escrever as questões. Questões novas, não reaproveitadas dos bancos de domínio. Cabeçalho `### Question N`. Instruções de prova no topo: cronometrado, sem consulta, resposta única. Gabarito em seção separada ao final, após um marcador `<!-- GABARITO -->` para permitir esconder na primeira leitura.
 
 - [ ] **Step 2: Criar `erros.md`**
 
