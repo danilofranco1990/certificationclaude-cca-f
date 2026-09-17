@@ -4,13 +4,22 @@
 
 **Goal:** Produzir todo o material de preparação para a Claude Certified Architect – Foundations: cinco módulos de domínio (notas, armadilhas, lab, questões), um projeto integrador e dois simulados cronometrados.
 
-**Architecture:** Um módulo por domínio, na ordem do peso na prova. Cada módulo entrega quatro artefatos independentes e commitáveis separadamente: `notas.md` (teoria, PT), `armadilhas.md` (distinções confundíveis, PT), `lab/` (código executável) e `questions.md` (questões-cenário em EN com gabarito comentado em PT). Os labs crescem em complexidade e desembocam no projeto integrador da Task 7.
+**Architecture:** Um módulo por domínio, na ordem do peso na prova. Cada módulo entrega cinco artefatos independentes e commitáveis separadamente: `notas.md` (teoria, PT), `armadilhas.md` (distinções confundíveis, PT), `lab/` (código executável), `questions.md` (só as questões-cenário, em EN) e `gabarito.md` (respostas e explicações, em PT). Ver o **Template de módulo de domínio** abaixo — ele é obrigatório e vale mais que a descrição individual de cada task. Os labs crescem em complexidade e desembocam no projeto integrador da Task 7.
 
 **Tech Stack:** Markdown; Claude Code CLI; Claude Agent SDK (TypeScript); Claude API (Messages, Tool Use, Message Batches); MCP SDK; Node.js 20+.
 
 **Convenção de verificação:** artefatos de conteúdo são verificados por critério objetivo (contagem, presença de seção, formato). Labs são verificados por comando executável com saída esperada.
 
 **Convenção de progresso (vale para todas as tasks):** ao fechar qualquer task, antes do commit, marque as células correspondentes na tabela de progresso do `README.md` e reescreva a seção "Próximo passo" apontando a próxima task. `README.md` entra no commit da própria task. Isso não é repetido em cada task abaixo de propósito — é uma regra única para não haver duas fontes de verdade.
+
+**Template de módulo de domínio (obrigatório nas Tasks 2 a 6).** Estabelecido na revisão da Task 2 para que os cinco módulos tenham a mesma forma:
+
+1. **Estrutura fixa de seção em `notas.md`.** Toda seção abre com `### Definição` (mesmo que seja uma linha apontando para o glossário), tem uma subseção de critério de decisão sempre chamada `### Quando usar` (mesmo quando o conteúdo é "quando *não* usar"), e fecha com `### Cenário de prova`. Sem variação de nome entre seções.
+2. **Referências cruzadas são campo obrigatório, não enfeite.** Toda entrada de `armadilhas.md` termina com `ver notas.md §N`. Toda entrada do gabarito que testa uma armadilha aponta `ver armadilhas.md — <título>`. Retrofitar isso depois de cinco domínios é caro; escrever junto é quase de graça.
+3. **Gabarito em arquivo separado.** Cada módulo produz `questions.md` (só as questões) e `gabarito.md` (respostas e explicações). Um único arquivo permite que um scroll ou um `Ctrl+F` estrague o autoteste. Vale também para os simulados das Tasks 8 e 9: `simulado-NN.md` e `simulado-NN-gabarito.md`, substituindo o marcador `<!-- GABARITO -->`.
+4. **Glossário atualizado no mesmo commit.** Quando as notas de um domínio refinam ou contradizem um termo já em `referencias/glossario.md`, o glossário é corrigido no commit daquela task — nunca deixado divergir.
+5. **Padrão de código dos labs.** Quando um lab tiver dois caminhos de demonstração, compartilhar a configuração por spread (`{ ...BASE_OPTIONS, ...overrides }`), nunca copiando campos à mão. Usar os tipos de união discriminada do SDK em vez de `as unknown as`. O lab existe para ensinar o SDK — código que contorna o tipo ensina a contornar o tipo.
+6. **`lab/README.md` traz sempre** o critério de "funcionou" *antes* do comando, a execução real observada com números, o custo de pior caso da rodada completa, e uma linha de troubleshooting separando "meu código está errado" de "o ambiente atrapalhou".
 
 **Fonte de verdade dos pesos:** a tabela do `README.md`. Os percentuais nos títulos das tasks e a distribuição de questões dos simulados (Tasks 8 e 9) são **derivados** dela. Se o Exam Guide oficial trouxer pesos diferentes, atualize o `README.md` primeiro e recalcule a distribuição dos simulados a partir dele.
 
@@ -439,7 +448,7 @@ git commit -m "feat: projeto integrador multiagente com MCP, saida estruturada e
 
 - [ ] **Step 1: Montar `simulado-01.md`**
 
-60 questões **em inglês**, distribuídas pelo peso real da prova: 16 do domínio 1, 12 do 2, 12 do 3, 11 do 4, 9 do 5. **Esses números são derivados da tabela de pesos do `README.md`** (27/20/20/18/15% × 60, arredondado) — se os pesos mudarem quando o Exam Guide oficial chegar, recalcule esta distribuição antes de escrever as questões. Questões novas, não reaproveitadas dos bancos de domínio. Cabeçalho `### Question N`. Instruções de prova no topo: cronometrado, sem consulta, resposta única. Gabarito em seção separada ao final, após um marcador `<!-- GABARITO -->` para permitir esconder na primeira leitura.
+60 questões **em inglês**, distribuídas pelo peso real da prova: 16 do domínio 1, 12 do 2, 12 do 3, 11 do 4, 9 do 5. **Esses números são derivados da tabela de pesos do `README.md`** (27/20/20/18/15% × 60, arredondado) — se os pesos mudarem quando o Exam Guide oficial chegar, recalcule esta distribuição antes de escrever as questões. Questões novas, não reaproveitadas dos bancos de domínio. Cabeçalho `### Question N`. Instruções de prova no topo: cronometrado, sem consulta, resposta única. Gabarito em arquivo separado `simulados/simulado-01-gabarito.md`, conforme o item 3 do template de módulo.
 
 - [ ] **Step 2: Criar `erros.md`**
 
@@ -467,7 +476,7 @@ git commit -m "feat: simulado 01 e log de erros"
 
 - [ ] **Step 1: Montar `simulado-02.md`**
 
-60 questões novas em inglês, mesma distribuição por peso da Task 8, com dificuldade deslocada para os domínios em que o log de erros da Task 8 mostrou desempenho abaixo de 85%. Mesmo formato de gabarito escondido.
+60 questões novas em inglês, mesma distribuição por peso da Task 8, com dificuldade deslocada para os domínios em que o log de erros da Task 8 mostrou desempenho abaixo de 85%. Gabarito em `simulados/simulado-02-gabarito.md`, mesmo formato.
 
 - [ ] **Step 2: Fechar o painel no `README.md`**
 
