@@ -11,7 +11,7 @@ fechando com um projeto integrador e dois simulados cronometrados.
 
 | Domínio | Peso | Notas | Armadilhas | Lab | Questões | Checkpoint % |
 |---|---|---|---|---|---|---|
-| 1. Agentic Architecture & Orchestration | 27% | [ ] | [ ] | [ ] | [ ] | — |
+| 1. Agentic Architecture & Orchestration | 27% | [x] | [x] | [x] | [x] | — |
 | 2. Claude Code Configuration & Workflows | 20% | [ ] | [ ] | [ ] | [ ] | — |
 | 3. Prompt Engineering & Structured Output | 20% | [ ] | [ ] | [ ] | [ ] | — |
 | 4. Tool Design & MCP Integration | 18% | [ ] | [ ] | [ ] | [ ] | — |
@@ -25,8 +25,13 @@ fechando com um projeto integrador e dois simulados cronometrados.
 
 ## Próximo passo
 
-Executar a Task 2 do plano: produzir notas, armadilhas, lab e questões do Domínio 1 —
-Agentic Architecture & Orchestration.
+Executar a Task 3 do plano: produzir notas, armadilhas, lab e questões do Domínio 2 —
+Claude Code Configuration & Workflows.
+
+> Domínio 1 entregue (notas, armadilhas, lab e 20 questões). O `Checkpoint %` da linha 1 segue
+> vazio de propósito: ele só é preenchido depois de responder
+> [`dominios/01-agentic-architecture/questions.md`](./dominios/01-agentic-architecture/questions.md)
+> em condição de prova, na semana 2 do cronograma.
 
 ## Pendências externas
 

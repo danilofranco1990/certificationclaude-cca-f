@@ -1,0 +1,18 @@
+{
+  "name": "ccar-f-lab-d1-orchestrator",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Lab do Dominio 1 (CCAR-F): orquestrador com fan-out de subagents via Claude Agent SDK.",
+  "scripts": {
+    "start": "tsx orchestrator.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.274"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.10.2"
+  }
+}
