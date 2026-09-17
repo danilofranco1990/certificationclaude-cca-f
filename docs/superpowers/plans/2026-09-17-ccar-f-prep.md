@@ -60,7 +60,7 @@ Links oficiais agrupados, cada um com uma linha dizendo para que serve no estudo
 
 - [ ] **Step 6: Escrever `referencias/glossario.md`**
 
-Tabela `Termo (EN) | Definição (PT) | Domínio`, com no mínimo 30 termos do syllabus: agentic loop, subagent, fan-out, hook, session, context window, lost in the middle, scratchpad, progressive summarization, provenance, tool_choice, tool_use, JSON Schema, enum, nullable, few-shot, Message Batches API, MCP server, MCP resource, transport, stdio, planning mode, headless mode, path-specific rules, skill, slash command, context fork, allowed-tools, argument-hint, confidence calibration, human escalation.
+Tabela `Termo (EN) | Definição (PT) | Domínio`, com no mínimo 30 termos do syllabus: agentic loop, subagent, fan-out, hook, session, context window, lost in the middle, scratchpad, progressive summarization, provenance, tool_choice, tool_use, JSON Schema, enum, null em JSON Schema vs. nullable do OpenAPI, few-shot, Message Batches API, MCP server, MCP resource, transport, stdio, planning mode, headless mode, path-specific rules, skill, slash command, context fork, allowed-tools, argument-hint, confidence calibration, human escalation.
 
 - [ ] **Step 7: Verificar**
 
@@ -155,7 +155,7 @@ Nove seções:
 3. **Slash commands customizados** — arquivos em `.claude/commands/`, o corpo como prompt, `$ARGUMENTS`.
 4. **Skills** — `SKILL.md` com `name` e `description`; a description é o gatilho de acionamento; progressive disclosure, em que só o metadado fica em contexto até a skill ser invocada.
 5. **Frontmatter `context: fork`** — roda em contexto separado e devolve só o resultado; quando isso protege a janela principal.
-6. **Frontmatter `allowed-tools` e `argument-hint`** — restringir ferramentas por comando; sinalizar a forma do argumento.
+6. **Frontmatter `allowed-tools`, `disallowed-tools` e `argument-hint`** — `allowed-tools` **concede** permissão para as ferramentas listadas durante o turno que invoca a skill, para que sejam usadas sem pedir aprovação; ele **não restringe nada** — toda ferramenta continua chamável e as permissões de base seguem valendo. Quem remove ferramentas do pool é `disallowed-tools`. Ambos os efeitos duram um turno e caem na mensagem seguinte. `argument-hint` sinaliza a forma do argumento.
 7. **Planning mode vs. execução direta** — quando exigir plano aprovado antes de agir.
 8. **Modo não-interativo** — `claude -p`, `--output-format json` e `stream-json`, como consumir a saída em script.
 9. **CI/CD** — Claude Code em GitHub Actions; permissões em ambiente sem humano; saída estruturada como contrato do pipeline.
@@ -166,13 +166,13 @@ Mínimo cinco entradas, mesmo formato da Task 2:
 
 - CLAUDE.md **vs.** Skill **vs.** slash command (sempre em contexto / sob demanda por descrição / invocado explicitamente)
 - `context: fork` **vs.** execução no contexto principal
-- `allowed-tools` no comando **vs.** `permissions` em `settings.json`
+- `allowed-tools` (concede, um turno) **vs.** `disallowed-tools` (restringe, um turno) **vs.** `permissions` em `settings.json` (persistente)
 - Planning mode **vs.** permission mode
 - `--output-format json` **vs.** `stream-json`
 
 - [ ] **Step 3: Escrever o lab — configuração completa**
 
-Projeto de exemplo com: slash command `review-diff` usando `argument-hint`, `allowed-tools` restrito a leitura e `context: fork`; Skill `api-conventions` com description acionável; regra por caminho em `.claude/rules/sql.md` valendo só para `**/*.sql`. O `README.md` explica o que cada peça demonstra.
+Projeto de exemplo com: slash command `review-diff` usando `argument-hint`, `allowed-tools` concedendo as ferramentas de leitura sem prompt, `disallowed-tools` removendo `Write` e `Edit` do pool, e `context: fork`; Skill `api-conventions` com description acionável; regra por caminho em `.claude/rules/sql.md` valendo só para `**/*.sql`. O `README.md` explica o que cada peça demonstra — em particular, que é `disallowed-tools`, e não `allowed-tools`, que impede a escrita.
 
 - [ ] **Step 4: Rodar o lab**
 
@@ -216,7 +216,7 @@ Nove seções:
 1. **Critérios objetivos** — transformar "escreva um bom resumo" em rubrica verificável.
 2. **Few-shot prompting** — quantidade, diversidade, e por que incluir o caso difícil entre os exemplos.
 3. **Saída estruturada via `tool_use`** — forçar o formato pelo schema da ferramenta em vez de pedir JSON em texto livre.
-4. **Design de JSON Schema** — `required`, opcional, `nullable`, `enum`, `additionalProperties`; a `description` de cada campo funciona como prompt.
+4. **Design de JSON Schema** — `required`, campos opcionais, `enum`, `additionalProperties`; a `description` de cada campo funciona como prompt. Como expressar nulo em JSON Schema: `"type": ["string", "null"]` ou `anyOf` — e por que `nullable: true` é keyword do OpenAPI 3.0 e não tem efeito algum num `input_schema`.
 5. **Ausente vs. nulo vs. desconhecido** — modelar "não encontrado" explicitamente em vez de deixar o modelo inventar.
 6. **Validação e retry com feedback** — devolver a mensagem do validador ao modelo em vez de repetir a mesma chamada.
 7. **Extração de documentos não estruturados** — ancorar cada campo numa citação do trecho de origem.
@@ -228,14 +228,14 @@ Nove seções:
 Mínimo cinco entradas:
 
 - `tool_use` com schema **vs.** pedir JSON no texto da resposta
-- Campo opcional **vs.** `nullable` **vs.** `enum` com valor `unknown`
+- Campo opcional (fora de `required`) **vs.** nulo explícito (`"type": ["string","null"]`) **vs.** `enum` com valor `unknown` — incluindo a pegadinha de escrever `nullable: true`, que é OpenAPI e é silenciosamente ignorado em JSON Schema
 - Retry cego **vs.** retry com a mensagem de validação
 - Message Batches **vs.** chamada síncrona **vs.** streaming
 - Auto-revisão na mesma instância **vs.** instância independente
 
 - [ ] **Step 3: Escrever o lab — extrator validado**
 
-`schema.ts` define o JSON Schema de extração de contrato: partes, datas, valores, `enum` de tipo de contrato e campos nullable. `extract.ts` envia um documento não estruturado, força `tool_use`, valida a saída e, em caso de falha, faz **um** retry injetando o erro de validação no prompt. As duas fixtures fornecem um contrato completo e um com campo faltando.
+`schema.ts` define o JSON Schema de extração de contrato: partes, datas, valores, `enum` de tipo de contrato e campos que aceitam null via `"type": ["string", "null"]`. `extract.ts` envia um documento não estruturado, força `tool_use`, valida a saída e, em caso de falha, faz **um** retry injetando o erro de validação no prompt. As duas fixtures fornecem um contrato completo e um com campo faltando.
 
 - [ ] **Step 4: Rodar o lab**
 
@@ -403,7 +403,7 @@ Tabela explícita ligando cada um dos cinco domínios ao componente do projeto q
 
 - [ ] **Step 3: Saída estruturada**
 
-`schema.ts` define o relatório final como JSON Schema, com `enum` de nível de confiança e campos nullable para o que não foi encontrado.
+`schema.ts` define o relatório final como JSON Schema, com `enum` de nível de confiança e campos que aceitam null (via `"type": [...,"null"]`) para o que não foi encontrado.
 
 - [ ] **Step 4: Orquestrador multiagente**
 
