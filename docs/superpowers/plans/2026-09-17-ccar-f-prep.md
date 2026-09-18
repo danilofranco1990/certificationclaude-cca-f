@@ -558,7 +558,7 @@ Varre `README.md`, `COMO-ESTUDAR.md`, `cronograma.md`, `referencias/*.md`, `domi
 
 - [ ] **Step 3: `tools/site.css`**
 
-Mobile-first, largura de leitura confinada (~68ch), tipografia com hierarquia clara, tema claro e escuro via `prefers-color-scheme`, tabelas com scroll horizontal próprio, blocos de código legíveis. Sem CDN, sem fonte externa, sem framework. Legibilidade em sessão longa é o critério, não decoração.
+Mobile-first, largura de leitura confinada (~68ch), tipografia com hierarquia clara, tema claro e escuro via `prefers-color-scheme`, tabelas com scroll horizontal próprio, blocos de código legíveis. Sem CDN de script e sem framework. A única exceção é a família IBM Plex via Google Fonts — é o único host de fontes que o CSP de artifacts publicados admite — sempre com stack de fallback completa, para que o site siga legível aberto offline como `file://`. Legibilidade em sessão longa é o critério, não decoração.
 
 - [ ] **Step 4: `.gitignore` e `README.md`**
 

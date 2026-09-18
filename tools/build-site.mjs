@@ -594,7 +594,7 @@ function build() {
   }
 
   writeFileSync(join(OUT, 'index.html'), page({
-    title: 'CCAR-F — material de estudo',
+    title: 'Preparação CCAR-F',
     register: 'plain',
     fromDir: '',
     nav: navHtml(groups, null, '', maxWeight),
