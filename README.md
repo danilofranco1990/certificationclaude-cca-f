@@ -25,8 +25,12 @@ fechando com um projeto integrador e dois simulados cronometrados.
 
 ## Próximo passo
 
-Executar a Task 3 do plano: produzir notas, armadilhas, lab e questões do Domínio 2 —
-Claude Code Configuration & Workflows.
+Executar a Task 11 do plano: build de HTML legível (`tools/build-site.mjs`), para que os
+Domínios 2–5 já nasçam renderizáveis. Só depois vem a Task 3 (Domínio 2).
+
+> Task 10 entregue: [`COMO-ESTUDAR.md`](./COMO-ESTUDAR.md) define o método de uso de cada
+> artefato, e o lab do Domínio 1 ganhou seu `## Roteiro de quebra` com cinco experimentos.
+> Nenhuma célula de domínio muda — esta task não fecha domínio nenhum.
 
 > Domínio 1 entregue (notas, armadilhas, lab e 20 questões). O `Checkpoint %` da linha 1 segue
 > vazio de propósito: ele só é preenchido depois de responder
@@ -46,5 +50,7 @@ Claude Code Configuration & Workflows.
 
 ## Navegação
 
+- Método de estudo — como usar notas, armadilhas, questões e labs:
+  [`COMO-ESTUDAR.md`](./COMO-ESTUDAR.md)
 - Cronograma semana a semana: [`cronograma.md`](./cronograma.md)
 - Spec de design deste programa: [`docs/superpowers/specs/2026-09-17-ccar-f-prep-design.md`](./docs/superpowers/specs/2026-09-17-ccar-f-prep-design.md)
