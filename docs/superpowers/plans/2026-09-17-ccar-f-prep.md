@@ -20,6 +20,7 @@
 4. **Glossário atualizado no mesmo commit.** Quando as notas de um domínio refinam ou contradizem um termo já em `referencias/glossario.md`, o glossário é corrigido no commit daquela task — nunca deixado divergir.
 5. **Padrão de código dos labs.** Quando um lab tiver dois caminhos de demonstração, compartilhar a configuração por spread (`{ ...BASE_OPTIONS, ...overrides }`), nunca copiando campos à mão. Usar os tipos de união discriminada do SDK em vez de `as unknown as`. O lab existe para ensinar o SDK — código que contorna o tipo ensina a contornar o tipo.
 6. **`lab/README.md` traz sempre** o critério de "funcionou" *antes* do comando, a execução real observada com números, o custo de pior caso da rodada completa, e uma linha de troubleshooting separando "meu código está errado" de "o ambiente atrapalhou".
+7. **Roteiro de quebra em todo `lab/README.md`.** O lab ensina por falha controlada, não por execução bem-sucedida. Cada lab traz uma seção `## Roteiro de quebra` com no mínimo quatro experimentos, cada um no formato: **o que mudar** (alteração concreta e pontual no código) → **o que deve acontecer** (a falha ou degradação esperada, observável) → **a que armadilha ou questão isso corresponde**. Experimentos que já ocorreram de verdade durante a construção do lab entram com essa marcação, porque falha real vale mais que falha imaginada.
 
 **Fonte de verdade dos pesos:** a tabela do `README.md`. Os percentuais nos títulos das tasks e a distribuição de questões dos simulados (Tasks 8 e 9) são **derivados** dela. Se o Exam Guide oficial trouxer pesos diferentes, atualize o `README.md` primeiro e recalcule a distribuição dos simulados a partir dele.
 
@@ -493,3 +494,79 @@ Expected: 60.
 git add simulados README.md
 git commit -m "feat: simulado 02 e fechamento do painel de progresso"
 ```
+
+---
+
+### Task 10: COMO-ESTUDAR.md e roteiros de quebra
+
+> **Executar imediatamente, antes da Task 3.** A regra 7 do template afeta os labs dos Domínios 2–5; o Domínio 1 precisa ser retrofitado agora para servir de modelo.
+
+**Files:**
+- Create: `COMO-ESTUDAR.md`
+- Modify: `dominios/01-agentic-architecture/lab/README.md`
+- Modify: `README.md`
+
+- [ ] **Step 1: Escrever `COMO-ESTUDAR.md`**
+
+O método, não o cronograma — `cronograma.md` já diz *quando*, este diz *como*. Quatro seções:
+
+1. **Notas — leitura ativa.** Ler uma seção, fechar o arquivo, escrever de memória o critério de "Quando usar", comparar. O que não se reproduz é o que ainda não se sabe; sublinhar não revela isso.
+2. **Armadilhas — recuperação ativa.** Ler só o título `### A vs. B` e enunciar o critério em voz alta antes de ler a resposta. Dominada é a armadilha cujo critério se enuncia sem olhar.
+3. **Questões — condição de prova.** Responder sem abrir `gabarito.md`, marcar num papel, corrigir depois. Cada erro vai para `simulados/erros.md` classificado por causa — desconhecimento, desatenção ou confusão entre conceitos — porque as três pedem remédios diferentes e só a primeira pede reler a teoria.
+4. **Labs — três passagens.** Rodar como está para ter linha de base; quebrar de propósito seguindo o `## Roteiro de quebra`; modificar em direção a um cenário de prova. Explicitar que a segunda passagem é onde está o aprendizado, e que rodar uma vez com sucesso ensina quase nada.
+
+- [ ] **Step 2: Escrever o `## Roteiro de quebra` do lab do Domínio 1**
+
+No mínimo quatro experimentos, no formato da regra 7. Os quatro obrigatórios, todos verificados durante a construção ou derivados diretamente do material:
+
+- Remover o contexto explícito do prompt de um worker → as respostas convergem → é o cenário da Question 5, ao vivo.
+- `maxTurns: 1` → os três workers morrem com `Reached maximum number of turns`, porque o passo de raciocínio consome um turno → **falha real ocorrida na construção**.
+- Path B sem instruir o orquestrador a esperar → delega os três corretamente e responde sem síntese → com o `Agent` tool, esperar é comportamento que se instrui, não padrão → **falha real ocorrida na construção**.
+- Criar dependência de estado entre dois workers → o speedup desaparece → armadilha "Execução paralela vs. sequencial: o teste é dependência de estado, não tamanho".
+
+Um quinto, de exploração: subir de três para cinco lentes e observar custo e contexto devolvido crescerem — em que ponto a economia de contexto do subagente se inverte.
+
+- [ ] **Step 3: Verificar**
+
+Run: `grep -c '^## ' COMO-ESTUDAR.md && grep -A200 '^## Roteiro de quebra' dominios/01-agentic-architecture/lab/README.md | grep -c '^### '`
+Expected: 4 seções em `COMO-ESTUDAR.md`; ≥4 experimentos no roteiro.
+
+- [ ] **Step 4: Commit**
+
+---
+
+### Task 11: Build de HTML legível
+
+> **Executar depois da Task 10 e antes da Task 3**, para que os Domínios 2–5 já nasçam renderizáveis.
+
+Converter os `.md` do repositório em HTML estilizado e responsivo, com o markdown permanecendo a única fonte de verdade. O HTML é gerado, nunca editado à mão.
+
+**Files:**
+- Create: `tools/build-site.mjs`
+- Create: `tools/site.css`
+- Create: `package.json` (raiz)
+- Modify: `.gitignore`
+- Modify: `README.md`
+
+- [ ] **Step 1: `package.json` na raiz**
+
+Uma dependência (`marked`) e um script `build` que roda `node tools/build-site.mjs`. Nada além disso.
+
+- [ ] **Step 2: `tools/build-site.mjs`**
+
+Varre `README.md`, `COMO-ESTUDAR.md`, `cronograma.md`, `referencias/*.md`, `dominios/*/*.md`, `dominios/*/lab/README.md`, `labs/**/README.md` e `simulados/*.md`; converte cada um para `site/<mesmo caminho>.html`; gera `site/index.html` com a navegação agrupada por domínio. Reescreve links `.md` → `.html` para que a navegação funcione dentro do site. Ignora `node_modules`. Determinístico: rodar duas vezes produz bytes idênticos.
+
+- [ ] **Step 3: `tools/site.css`**
+
+Mobile-first, largura de leitura confinada (~68ch), tipografia com hierarquia clara, tema claro e escuro via `prefers-color-scheme`, tabelas com scroll horizontal próprio, blocos de código legíveis. Sem CDN, sem fonte externa, sem framework. Legibilidade em sessão longa é o critério, não decoração.
+
+- [ ] **Step 4: `.gitignore` e `README.md`**
+
+Adicionar `site/` ao `.gitignore` — é artefato gerado. Documentar `npm run build` no `README.md`.
+
+- [ ] **Step 5: Verificar**
+
+Run: `npm install && npm run build && ls site/ site/dominios/01-agentic-architecture/ && node -e "const h=require('fs').readFileSync('site/index.html','utf8'); if(!h.includes('viewport')) throw new Error('sem meta viewport')"`
+Expected: `site/index.html` e um `.html` por `.md` de origem; nenhum link `.md` remanescente no HTML gerado; segunda execução produz bytes idênticos.
+
+- [ ] **Step 6: Commit**
