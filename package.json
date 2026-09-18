@@ -1,0 +1,11 @@
+{
+  "name": "ccar-f-prep",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build-site.mjs"
+  },
+  "dependencies": {
+    "marked": "18.0.13"
+  }
+}

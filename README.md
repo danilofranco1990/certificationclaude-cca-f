@@ -25,12 +25,15 @@ fechando com um projeto integrador e dois simulados cronometrados.
 
 ## Próximo passo
 
-Executar a Task 11 do plano: build de HTML legível (`tools/build-site.mjs`), para que os
-Domínios 2–5 já nasçam renderizáveis. Só depois vem a Task 3 (Domínio 2).
+Executar a Task 3 do plano: Domínio 2 — Claude Code Configuration & Workflows (20%), com
+`notas.md`, `armadilhas.md`, o lab de configuração e as 20 questões.
+
+> Task 11 entregue: `npm run build` gera o site de leitura (ver "Ler como site" abaixo). Os
+> Domínios 2–5 já nascem renderizáveis, sem mexer no gerador. Nenhuma célula de domínio muda —
+> esta task não fecha domínio nenhum.
 
 > Task 10 entregue: [`COMO-ESTUDAR.md`](./COMO-ESTUDAR.md) define o método de uso de cada
 > artefato, e o lab do Domínio 1 ganhou seu `## Roteiro de quebra` com cinco experimentos.
-> Nenhuma célula de domínio muda — esta task não fecha domínio nenhum.
 
 > Domínio 1 entregue (notas, armadilhas, lab e 20 questões). O `Checkpoint %` da linha 1 segue
 > vazio de propósito: ele só é preenchido depois de responder
@@ -47,6 +50,22 @@ Domínios 2–5 já nasçam renderizáveis. Só depois vem a Task 3 (Domínio 2)
    diferentes.
 2. **Confirmação de acesso ao Claude Partner Network** (adesão gratuita) — origem dos cursos
    de preparação gratuitos da Anthropic e do caminho de compra do exame.
+
+## Ler como site
+
+Todo o material tem uma versão HTML responsiva, gerada a partir dos próprios `.md`:
+
+```bash
+npm install
+npm run build
+```
+
+Abra `site/index.html` no navegador. A navegação fica agrupada por domínio e mostra o peso de
+cada um na prova, lido desta tabela de progresso.
+
+O **markdown continua sendo a única fonte de verdade**: `site/` é artefato gerado, está no
+`.gitignore` e nunca deve ser editado à mão — qualquer correção vai no `.md` e se propaga no
+próximo build. O gerador é `tools/build-site.mjs` e o estilo, `tools/site.css`.
 
 ## Navegação
 

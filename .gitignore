@@ -3,3 +3,6 @@ node_modules/
 *.log
 dist/
 .DS_Store
+
+# HTML gerado por `npm run build` — o markdown é a fonte de verdade
+site/

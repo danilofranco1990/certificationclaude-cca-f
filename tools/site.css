@@ -1,0 +1,619 @@
+/* ---------------------------------------------------------------------------
+   site.css — folha única do site gerado a partir dos .md do repositório.
+
+   Material de referência lido em sessão longa: a qualidade está em espaçamento,
+   hierarquia e legibilidade. Sem hero, sem gradiente, sem animação.
+
+   Regra de tema: a paleta clara completa mora no `:root` puro. Os blocos de
+   tema abaixo redefinem SOMENTE tokens — nenhuma cor de componente é declarada
+   dentro de `@media` ou de `[data-theme]`.
+--------------------------------------------------------------------------- */
+
+:root {
+  /* paleta clara — neutros frios, levemente azulados (papel de tela) */
+  --ground:  #F6F7F9;
+  --surface: #FFFFFF;
+  --ink:     #15181D;
+  --muted:   #5C6470;
+  --rule:    #DFE3E9;
+  --accent:  #0F5C57;
+  --warn:    #9A5B0E;
+  --code-bg: #EFF1F4;
+  --scheme:  light;
+
+  /* tipografia */
+  --font-head: 'IBM Plex Serif', Georgia, 'Times New Roman', serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+
+  --fs-xs:  0.75rem;
+  --fs-sm:  0.875rem;
+  --fs-md:  1rem;
+  --fs-lg:  1.125rem;
+  --fs-xl:  1.3125rem;
+  --fs-2xl: 1.5rem;
+  --fs-3xl: 1.875rem;
+
+  /* espaço */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+  --sp-8: 4rem;
+
+  --measure: 68ch;
+  --nav-w: 260px;
+
+  color-scheme: var(--scheme);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:  #101317;
+    --surface: #171B21;
+    --ink:     #E6E9EE;
+    --muted:   #98A2B0;
+    --rule:    #262C35;
+    --accent:  #4FB3A6;
+    --warn:    #D69A4C;
+    --code-bg: #1C222A;
+    --scheme:  dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:  #101317;
+  --surface: #171B21;
+  --ink:     #E6E9EE;
+  --muted:   #98A2B0;
+  --rule:    #262C35;
+  --accent:  #4FB3A6;
+  --warn:    #D69A4C;
+  --code-bg: #1C222A;
+  --scheme:  dark;
+}
+
+/* ------------------------------------------------------------------ base */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html {
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  line-height: 1.65;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: var(--sp-2);
+  z-index: 10;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm);
+}
+
+.skip-link:focus { left: var(--sp-2); }
+
+/* --------------------------------------------------------------- layout */
+
+.shell {
+  display: block;
+}
+
+.main {
+  padding: var(--sp-5) var(--sp-4) var(--sp-8);
+  min-width: 0;
+}
+
+.doc {
+  max-width: var(--measure);
+  margin: 0 auto;
+}
+
+.foot {
+  max-width: var(--measure);
+  margin: var(--sp-8) auto 0;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+/* ----------------------------------------------------------- navegação */
+
+.nav-box {
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+}
+
+.nav-toggle {
+  cursor: pointer;
+  list-style: none;
+  padding: var(--sp-3) var(--sp-4);
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.nav-toggle::-webkit-details-marker { display: none; }
+
+.nav-toggle::before {
+  content: "\203A";
+  display: inline-block;
+  width: 1em;
+  color: var(--accent);
+  transform: rotate(0deg);
+  transition: transform 120ms linear;
+}
+
+.nav-box[open] > .nav-toggle::before { transform: rotate(90deg); }
+
+.nav-body {
+  padding: 0 var(--sp-4) var(--sp-5);
+}
+
+.nav-brand {
+  margin: 0 0 var(--sp-5);
+  font-family: var(--font-head);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+
+.nav-brand a { text-decoration: none; }
+.nav-brand a:hover { text-decoration: underline; }
+
+.nav-group { margin-bottom: var(--sp-5); }
+
+.nav-head {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.nav-weight {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-2);
+}
+
+.nav-bar {
+  flex: 0 0 72px;
+  height: 4px;
+  background: var(--rule);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.nav-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.nav-pct {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.nav-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-list li { margin: 0; }
+
+.nav-list a {
+  display: block;
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 2px solid var(--rule);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  text-decoration: none;
+}
+
+.nav-list a:hover {
+  border-left-color: var(--accent);
+  color: var(--accent);
+}
+
+.nav-list a.is-current {
+  border-left-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--code-bg);
+}
+
+/* -------------------------------------------------------- tipografia */
+
+.doc h1,
+.doc h2,
+.doc h3,
+.doc h4,
+.doc h5,
+.doc h6 {
+  font-family: var(--font-head);
+  font-weight: 600;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.doc h1 {
+  margin: 0 0 var(--sp-5);
+  font-size: var(--fs-3xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.doc h2 {
+  margin: var(--sp-8) 0 var(--sp-4);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--fs-2xl);
+}
+
+.doc h3 {
+  margin: var(--sp-6) 0 var(--sp-3);
+  font-size: var(--fs-xl);
+}
+
+.doc h4 {
+  margin: var(--sp-5) 0 var(--sp-2);
+  font-size: var(--fs-lg);
+}
+
+.doc h5,
+.doc h6 {
+  margin: var(--sp-5) 0 var(--sp-2);
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.doc p,
+.doc ul,
+.doc ol {
+  margin: 0 0 var(--sp-4);
+  text-wrap: pretty;
+}
+
+.doc ul,
+.doc ol { padding-left: var(--sp-5); }
+
+.doc li { margin-bottom: var(--sp-2); }
+
+.doc li > ul,
+.doc li > ol { margin-top: var(--sp-2); }
+
+.doc strong { font-weight: 600; }
+
+.doc hr {
+  margin: var(--sp-7) 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.doc blockquote {
+  margin: 0 0 var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border-left: 3px solid var(--rule);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.doc blockquote > :last-child { margin-bottom: 0; }
+
+.lede {
+  font-size: var(--fs-lg);
+  color: var(--muted);
+}
+
+/* --------------------------------------------------- código e tabelas */
+
+.doc code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--code-bg);
+  border-radius: 3px;
+  padding: 0.12em 0.32em;
+}
+
+.doc pre {
+  margin: 0;
+  padding: var(--sp-4);
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+
+.doc pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.scroll-x {
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 0 0 var(--sp-5);
+  -webkit-overflow-scrolling: touch;
+}
+
+.doc table {
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.doc th,
+.doc td {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+
+.doc th {
+  background: var(--code-bg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.doc img { max-width: 100%; height: auto; }
+
+/* ============================================================ registros
+
+   Três registros de conteúdo que o leitor precisa distinguir de relance.
+   O <body> carrega a classe; o CSS diferencia pela estrutura de dentro.
+   ========================================================================= */
+
+/* --- armadilhas: cada entrada é uma distinção; o ocre é reservado a elas -- */
+
+.reg-armadilhas .doc h3 {
+  padding-left: var(--sp-4);
+  border-left: 3px solid var(--warn);
+}
+
+.reg-armadilhas .doc > p.lead-label > strong:first-child {
+  display: inline-block;
+  margin-right: var(--sp-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.doc blockquote.q-trap {
+  border-left-color: var(--warn);
+  background: var(--surface);
+  background: color-mix(in srgb, var(--warn) 7%, var(--surface));
+  color: var(--ink);
+}
+
+.doc blockquote.q-trap strong { color: var(--warn); }
+
+/* --- ponteiros de referência: leves, nunca bloco de citação pesado ------- */
+
+.doc blockquote.q-ref {
+  padding: 0;
+  border-left: 0;
+  background: none;
+  color: var(--accent);
+  font-size: var(--fs-sm);
+}
+
+.doc blockquote.q-ref p { margin-bottom: var(--sp-2); }
+
+.doc blockquote.q-ref strong {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* --- questões: chip numerado e alternativas com respiro para o polegar --- */
+
+.reg-questions .doc .q-head {
+  margin: var(--sp-7) 0 var(--sp-4);
+  padding: 0;
+  border: 0;
+}
+
+.q-chip {
+  display: inline-block;
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--code-bg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+
+/*
+ * Recuo pendente em vez de flex: um `<code>` dentro da alternativa vira um
+ * item de flex próprio e a linha se parte em pedaços.
+ */
+.doc li:has(> .opt-key) {
+  list-style: none;
+  margin-left: calc(-1 * var(--sp-5));
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-1) 0 var(--sp-1) 2em;
+  text-indent: -2em;
+}
+
+.opt-key {
+  display: inline-block;
+  width: 2em;
+  text-indent: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* --- gabarito: respostas; o ponteiro de armadilha já vem em .q-ref ------- */
+
+.reg-gabarito .doc h3 {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+/* --- notas: esqueleto Definição / Quando usar / Cenário de prova --------- */
+
+.reg-notas .doc h3.k-def,
+.reg-notas .doc h3.k-when {
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.reg-notas .doc h3.k-when { color: var(--accent); }
+
+.case-block {
+  margin: var(--sp-5) 0;
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  border-radius: 3px;
+  background: var(--surface);
+}
+
+.case-block > h3.k-case {
+  margin-top: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.case-block > :last-child { margin-bottom: 0; }
+
+/* ---------------------------------------------------------------- índice */
+
+.idx-group { margin-bottom: var(--sp-6); }
+
+.idx-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.idx-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.idx-path {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------- desktop */
+
+@media (min-width: 860px) {
+  :root { font-size: 106.25%; }
+
+  .shell {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-7);
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  .nav-box {
+    position: sticky;
+    top: 0;
+    flex: 0 0 var(--nav-w);
+    width: var(--nav-w);
+    max-height: 100vh;
+    overflow-y: auto;
+    padding: var(--sp-6) 0 var(--sp-7);
+    border-bottom: 0;
+    border-right: 1px solid var(--rule);
+    background: var(--ground);
+  }
+
+  /* o disclosure existe para o mobile; no desktop a navegação é permanente */
+  .nav-toggle { display: none; }
+  .nav-box > .nav-body { display: block; }
+  .nav-box::details-content { content-visibility: visible; }
+
+  .main {
+    flex: 1 1 auto;
+    padding: var(--sp-7) var(--sp-5) var(--sp-8) 0;
+  }
+}
+
+/* --------------------------------------------------------- movimento */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
