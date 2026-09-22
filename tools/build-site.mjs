@@ -85,6 +85,7 @@ function collectSources() {
   };
 
   add('README.md');
+  add('ROTEIRO.md');
   add('COMO-ESTUDAR.md');
   add('cronograma.md');
 
@@ -382,6 +383,7 @@ function renderTokens(inst, tokens, register) {
 
 const ROOT_LABELS = new Map([
   ['README.md', 'Início'],
+  ['ROTEIRO.md', 'Roteiro'],
   ['COMO-ESTUDAR.md', 'Como estudar'],
   ['cronograma.md', 'Cronograma'],
 ]);

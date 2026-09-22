@@ -14,6 +14,9 @@ Módulo 0 (fundamentos) → Domínio 1 → Domínio 2 → Domínio 3 → Domíni
                                                 → Projeto integrador → Simulados 01 e 02
 ```
 
+O passo a passo executável dessa trilha — com o que abrir, o que produzir e o critério para
+avançar em cada etapa — está em [`ROTEIRO.md`](./ROTEIRO.md).
+
 Comece pelo [`Módulo 0 — Fundamentos`](./dominios/00-fundamentos/notas.md): ele ensina do zero o
 que todos os domínios assumem (o modelo, a API stateless, o ciclo `tool_use`, o agent loop).
 Não é domínio de prova — não tem peso nem checkpoint de questões, e por isso fica fora da tabela
@@ -91,6 +94,7 @@ próximo build. O gerador é `tools/build-site.mjs` e o estilo, `tools/site.css`
 
 ## Navegação
 
+- Roteiro de estudo — a sequência exata a seguir, etapa por etapa: [`ROTEIRO.md`](./ROTEIRO.md)
 - Método de estudo — como usar notas, armadilhas, questões e labs:
   [`COMO-ESTUDAR.md`](./COMO-ESTUDAR.md)
 - Cronograma semana a semana: [`cronograma.md`](./cronograma.md)
