@@ -5,6 +5,18 @@ produz os quatro artefatos padrão (`notas.md`, `armadilhas.md`, `lab/`, `questi
 com um checkpoint de questões daquele domínio. Meta do checkpoint: **≥ 80%** de acerto. Abaixo
 disso, o domínio não é dado por encerrado e volta como prioridade na revisão da semana 11.
 
+## Antes da semana 1 — Módulo 0: Fundamentos
+
+- **Foco:** o alicerce que os cinco domínios assumem — o que o modelo é, a API stateless, o
+  ciclo `tool_use`/`tool_result`, `stop_reason` e o agent loop.
+- **Material:** [`dominios/00-fundamentos/notas.md`](./dominios/00-fundamentos/notas.md),
+  estudado por leitura ativa (método em `COMO-ESTUDAR.md` §1, com os `### Checkpoint` no lugar
+  do checkpoint de questões — o módulo não tem banco próprio).
+- **Critério para seguir adiante:** responder os checkpoints por escrito sem consulta e
+  conseguir desenhar de memória o fluxo request → `tool_use` → execução → `tool_result` →
+  `end_turn` numa folha de papel. Quem já domina o ciclo na prática faz só isso e segue; quem
+  não domina, lê o módulo inteiro antes de abrir o Domínio 1 — não conta contra as 12 semanas.
+
 ## Semana 1 — Domínio 1: Agentic Architecture & Orchestration (parte 1) (Task 2 do plano)
 
 - **Foco:** anatomia do loop agêntico (gather context → take action → verify results → repeat),

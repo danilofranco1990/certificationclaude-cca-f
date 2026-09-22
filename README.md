@@ -7,6 +7,19 @@ supervisão remota ou em centro de testes). Preço listado: **US$ 125**.
 Programa de estudo de 12 semanas, organizado pelos cinco domínios oficiais do syllabus,
 fechando com um projeto integrador e dois simulados cronometrados.
 
+## Trilha de estudo
+
+```text
+Módulo 0 (fundamentos) → Domínio 1 → Domínio 2 → Domínio 3 → Domínio 4 → Domínio 5
+                                                → Projeto integrador → Simulados 01 e 02
+```
+
+Comece pelo [`Módulo 0 — Fundamentos`](./dominios/00-fundamentos/notas.md): ele ensina do zero o
+que todos os domínios assumem (o modelo, a API stateless, o ciclo `tool_use`, o agent loop).
+Não é domínio de prova — não tem peso nem checkpoint de questões, e por isso fica fora da tabela
+abaixo —, mas **nenhum domínio deve ser aberto antes dele**. Quem já domina o ciclo de
+ferramentas na prática usa os `### Checkpoint` do módulo como autoteste rápido e segue adiante.
+
 ## Progresso por domínio
 
 | Domínio | Peso | Notas | Armadilhas | Lab | Questões | Checkpoint % |

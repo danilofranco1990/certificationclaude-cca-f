@@ -3,10 +3,21 @@
 Termos do syllabus com definição precisa em português. Termos técnicos permanecem em inglês
 (convenção do repositório). Coluna "Domínio" aponta o módulo em que o termo é aprofundado —
 vários termos são citados em mais de um domínio; a coluna indica onde ele é definido em detalhe.
-Tabela ordenada por Domínio e, dentro de cada domínio, alfabeticamente pelo termo.
+O Domínio `0` é o [módulo de fundamentos](../dominios/00-fundamentos/notas.md), pré-requisito de
+leitura fora do syllabus da prova. Tabela ordenada por Domínio e, dentro de cada domínio,
+alfabeticamente pelo termo.
 
 | Termo (EN) | Definição (PT) | Domínio |
 |---|---|---|
+| agentic harness | O software que envolve o modelo e fornece o agent loop, as ferramentas, a gestão de contexto e os controles de execução. Claude Code e o Agent SDK são harnesses; o modelo é só a camada de geração de texto. Executar tools é papel do harness/aplicação — nunca do modelo. | 0 |
+| inference | O ato de gerar a saída a partir da entrada, token a token. Não altera os parâmetros do modelo, congelados no treinamento: "o agente aprendeu" significa sempre que a informação entrou no contexto da chamada seguinte, nunca que o modelo mudou. | 0 |
+| messages | Parâmetro da Messages API que carrega a **conversa completa** (não só a mensagem nova), como lista de turnos `user`/`assistant`. Como a API é stateless, é reenviado inteiro a cada chamada — é a única memória da conversa, e cresce (e custa) a cada turno. | 0 |
+| SDK | *Software Development Kit* — biblioteca oficial que empacota o acesso a uma API numa linguagem (ex.: `@anthropic-ai/sdk`). O **Claude Agent SDK** vai além do acesso: entrega o agent loop e as ferramentas do Claude Code em forma de biblioteca. | 0 |
+| stateless | Propriedade de uma API cujo servidor não retém nada entre requisições: cada chamada carrega tudo de que precisa. Na Messages API, implica que o histórico é responsabilidade da aplicação e que nada "atravessa" entre chamadas fora do que está escrito na requisição. | 0 |
+| stop_reason | Campo de toda resposta da Messages API que diz **por que a geração parou**: `end_turn`, `tool_use`, `max_tokens`, `stop_sequence`, `pause_turn`, `refusal`. É o sinal de controle do agent loop — `tool_use` = execute e devolva `tool_result`; `end_turn` = turno concluído. | 0 |
+| system prompt | O parâmetro `system` da Messages API: a instrução do operador, fora do array `messages`, reenviada igual a cada chamada. Regra que precisa valer a conversa inteira mora aqui (ou em mecanismo que recarrega a cada turno, como `CLAUDE.md`) — nunca num turno antigo do histórico. | 0 |
+| token | Unidade em que o modelo lê e escreve texto (pedaços de palavra). Tudo na API é medido em tokens: o custo, o teto de saída (`max_tokens`) e o orçamento da context window. | 0 |
+| tool_result | Content block escrito **pela aplicação** (num turno `user`) com o resultado de um `tool_use`, casado pelo `tool_use_id`; `is_error: true` sinaliza falha de execução. Resultados de chamadas paralelas voltam todos numa única mensagem user. Contraparte de `tool_use`, que é escrito pelo modelo. | 0 |
 | agentic loop | O ciclo *gather context → take action → verify results → repeat* que caracteriza um agente, em oposição a uma única chamada ao modelo. A etapa de verificação é o que distingue um agente de uma completion isolada. | 1 |
 | fan-out | Padrão de disparar múltiplos subagents em paralelo, cada um com um recorte independente do problema, para depois sintetizar os resultados. Só é seguro quando as subtarefas não compartilham estado mutável. | 1 |
 | hook | Script determinístico configurado em `settings.json` que o Claude Code executa automaticamente em um ponto fixo do ciclo de vida (ex.: `PreToolUse`, `PostToolUse`, `SessionStart`, `Stop`). Roda sempre, independentemente do que o modelo decidir — ao contrário de uma instrução em prompt, que é probabilística. | 1 |

@@ -438,6 +438,28 @@ a:hover { text-decoration-thickness: 2px; }
 
 .doc blockquote.q-trap strong { color: var(--warn); }
 
+/* --- avisos didáticos: "⚠️ Não confunda" pesa; "Guarde este ponto" é leve - */
+
+.doc blockquote.q-warn {
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 7%, var(--surface));
+  color: var(--ink);
+}
+
+.doc blockquote.q-warn strong { color: var(--warn); }
+
+.doc blockquote.q-note {
+  border-left-color: var(--accent);
+  background: none;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.doc blockquote.q-note strong {
+  font-weight: 500;
+  color: var(--accent);
+}
+
 /* --- ponteiros de referência: leves, nunca bloco de citação pesado ------- */
 
 .doc blockquote.q-ref {
@@ -512,7 +534,10 @@ a:hover { text-decoration-thickness: 2px; }
 /* --- notas: esqueleto Definição / Quando usar / Cenário de prova --------- */
 
 .reg-notas .doc h3.k-def,
-.reg-notas .doc h3.k-when {
+.reg-notas .doc h3.k-when,
+.reg-notas .doc h3.k-prob,
+.reg-notas .doc h3.k-mm,
+.reg-notas .doc h3.k-check {
   font-family: var(--font-body);
   font-size: var(--fs-sm);
   font-weight: 600;
@@ -521,7 +546,29 @@ a:hover { text-decoration-thickness: 2px; }
   color: var(--muted);
 }
 
-.reg-notas .doc h3.k-when { color: var(--accent); }
+.reg-notas .doc h3.k-when,
+.reg-notas .doc h3.k-check { color: var(--accent); }
+
+/* --- checkpoints: a resposta mora num <details>; o resumo convida --------- */
+
+.doc details {
+  margin: 0 0 var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.doc details > summary {
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.doc details[open] > summary { margin-bottom: var(--sp-3); }
+
+.doc details > :last-child { margin-bottom: 0; }
 
 .case-block {
   margin: var(--sp-5) 0;

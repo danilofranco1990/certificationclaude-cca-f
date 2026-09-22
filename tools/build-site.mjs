@@ -229,12 +229,23 @@ const NOTAS_HEADINGS = new Map([
   ['definição', 'k-def'],
   ['quando usar', 'k-when'],
   ['cenário de prova', 'k-case'],
+  ['o problema', 'k-prob'],
+  ['modelo mental', 'k-mm'],
 ]);
+
+/** Classe de esqueleto de um h3 de notas; "Checkpoint" aceita sufixo livre. */
+function notasHeadingClass(plain) {
+  const key = plain.toLowerCase();
+  if (key.startsWith('checkpoint')) return 'k-check';
+  return NOTAS_HEADINGS.get(key) || '';
+}
 
 function quoteClass(text) {
   const lead = String(text || '').replace(/^[\s>]+/, '').replace(/^[*_]+/, '').trim();
   if (/^Distrator\s+cl[áa]ssico/i.test(lead)) return 'q-trap';
   if (/^(Teoria|Armadilha\s+testada)\b/i.test(lead)) return 'q-ref';
+  if (/^(⚠️|N[ãa]o\s+confunda)/iu.test(lead)) return 'q-warn';
+  if (/^Guarde\s+este\s+ponto/i.test(lead)) return 'q-note';
   return '';
 }
 
@@ -279,7 +290,7 @@ function makeMarked(ctx) {
         return `<h3 id="${id}" class="q-head"><span class="q-chip">${html}</span></h3>\n`;
       }
       const cls = ctx.register === 'notas' && token.depth === 3
-        ? NOTAS_HEADINGS.get(plain.toLowerCase()) || ''
+        ? notasHeadingClass(plain)
         : '';
       const attr = cls ? ` class="${cls}"` : '';
       return `<h${token.depth} id="${id}"${attr}>${html}</h${token.depth}>\n`;
@@ -433,8 +444,13 @@ function buildNav(sources, titles, weights) {
 
     const n = Number((/^(\d+)-/.exec(dir) || [])[1]);
     const meta = weights.get(n);
+    // O módulo 0 (fundamentos) não é domínio de prova: não tem linha na tabela
+    // de pesos do README, mas precisa de um rótulo digno na navegação.
+    const fallback = Number.isFinite(n)
+      ? `${n}. ${titleize(dir.replace(/^\d+-/, ''))}`
+      : titleize(dir);
     groups.push({
-      label: meta ? `${n}. ${meta.name}` : titleize(dir),
+      label: meta ? `${n}. ${meta.name}` : fallback,
       weight: meta ? meta.weight : null,
       items,
     });
