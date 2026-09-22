@@ -782,17 +782,39 @@ revisar um relatório que ainda não existe é dependência de estado pura.
 
 ## 5. Passagem explícita de contexto
 
+A §3 estabeleceu o fato (nada do contexto do pai atravessa) e a §4 multiplicou os destinatários
+(vários workers ao mesmo tempo). Este capítulo é sobre a consequência prática: se o prompt de
+delegação é o único canal, então **escrever esse prompt é o trabalho de arquitetura** — e há um
+jeito certo e vários errados de escrevê-lo.
+
+### O problema
+
+Releia a lei de baixo para cima. No Módulo 0 §2, a API é stateless: nada existe para o modelo
+além do que está escrito na requisição. Na §3, o subagent é uma conversa nova: nada existe para
+ele além do que está escrito no prompt de delegação (mais o que o harness recarrega do disco).
+**É a mesma lei, em dois níveis.** O problema é que o orquestrador — que tem todo o contexto na
+própria janela — escreve prompts como quem fala com um colega que acompanhou a reunião: "como
+discutimos", "continue de onde paramos", "aplique o mesmo critério". Do outro lado, não houve
+reunião. E o subagent não devolve um erro dizendo isso: **preenche a lacuna com uma suposição
+plausível e segue em frente com confiança.** O resultado volta bem escrito, no formato pedido,
+e sutilmente desconectado do que o pai queria.
+
+### Modelo mental
+
+O prompt de delegação como um **briefing para um freelancer competente que nunca pisou na sua
+empresa**: ele faz bem qualquer coisa que esteja no papel, e inventa com naturalidade qualquer
+coisa que não esteja. A pergunta ao escrever nunca é "o que eu sei?" — é "o que está no papel?".
+
 ### Definição
 
 Passagem explícita de contexto é a prática de escrever no prompt de delegação **tudo** que o
 subagent precisa saber, porque nada do contexto do pai chega até ele por outro caminho.
 
-**O antipadrão é o inverso: assumir contexto implícito.** Assumir que o subagent sabe algo que só o pai sabe. Como a tabela da seção 3 mostra, o subagent
-não recebe histórico, não recebe os arquivos já lidos e não recebe as skills já invocadas. Todo
-prompt de delegação que contenha "como discutimos", "continue de onde paramos", "o arquivo que
-acabamos de ver" ou "aplique o mesmo critério" está referenciando um contexto que **não existe**
-do outro lado. O subagent não erra com erro: ele preenche a lacuna com uma suposição plausível e
-segue em frente com confiança.
+**O antipadrão é o inverso: assumir contexto implícito.** Assumir que o subagent sabe algo que
+só o pai sabe. Como a tabela da seção 3 mostra, o subagent não recebe histórico, não recebe os
+arquivos já lidos e não recebe as skills já invocadas. Todo prompt de delegação que contenha
+"como discutimos", "continue de onde paramos", "o arquivo que acabamos de ver" ou "aplique o
+mesmo critério" está referenciando um contexto que **não existe** do outro lado.
 
 A documentação do SDK é literal sobre o único canal que existe:
 
@@ -821,6 +843,46 @@ Traduzindo para o que falta com mais frequência:
 5. **Os fatos que o pai já tem** — caminhos de arquivo, ids, decisões já tomadas, valores
    literais. Recolher de novo o que o pai já sabe é o round-trip desperdiçado da seção 3.
 
+### ❌ / ✅ — o mesmo delegado, dois briefings
+
+O orquestrador do sistema de suporte (Módulo 0 §3) já resolveu o `customer_id`, o plano
+contratado e o caminho do contrato. Agora delega a análise de upgrade.
+
+**❌ Briefing problemático:**
+
+```text
+Analise as opções de upgrade deste cliente, como discutimos.
+Use as fontes aprovadas e devolva no formato padrão.
+```
+
+Lido item a item contra a lista canônica: o *objetivo* referencia uma discussão que não
+atravessou ("como discutimos" = nada); as *fontes* e o *formato* apontam para convenções que
+moram no histórico do pai ("aprovadas", "padrão" — quais?); os *fatos já resolvidos* (id, plano,
+caminho do contrato) ficaram de fora — o subagent vai gastar os primeiros turnos redescobrindo o
+que o pai já sabia; e não há *fronteira* nenhuma. Nenhuma dessas ausências gera erro: cada uma
+gera uma suposição.
+
+**✅ Briefing adequado:**
+
+```text
+OBJETIVO: liste as opções de upgrade de plano para o cliente abaixo, com custo
+mensal e o que muda em cada opção. Não recomende uma — apenas compare.
+
+FATOS JÁ RESOLVIDOS (não busque de novo):
+- customer_id: C-88231 · plano atual: Pro Anual
+- contrato: contracts/C-88231-2026.pdf
+
+FONTES: a tabela de planos em pricing/planos.md e o contrato acima. Nada além.
+
+FORMATO: tabela markdown com colunas plano | custo mensal | diferenças | restrições.
+
+FORA DO ESCOPO: elegibilidade de desconto (outro worker está cobrindo isso).
+```
+
+Funciona porque cada item da lista canônica está no papel: objetivo com verbo e entregável,
+fatos literais que eliminam o round-trip, fontes fechadas, formato que a síntese mescla sem
+reprocessar, e fronteira que diz o que **não** fazer — incluindo o que o worker vizinho cobre.
+
 ### A falha concreta de fronteira
 
 O que acontece quando as fronteiras ficam vagas, documentado:
@@ -832,6 +894,41 @@ Dois terços do custo do fan-out jogados fora — e o orquestrador ainda recebe 
 parecem concordar, quando na verdade duas são a mesma resposta. **Concordância entre workers
 que receberam o mesmo recorte não é evidência de nada.**
 
+### O que acontece se…
+
+**…dois workers receberem o mesmo recorte sem saber um do outro?** Duas respostas quase iguais,
+bem escritas, que "se confirmam". A síntese lê a convergência como consenso — quando é eco. O
+custo foi pago em dobro e a cobertura ficou pela metade. O conserto não é deduplicar depois (o
+dinheiro já foi) nem adicionar workers (multiplica o eco): é recorte próprio + lista dos
+recortes alheios no briefing de cada um.
+
+**…faltar só o item 5 (os fatos já resolvidos)?** Nada duplica e nada colide — o subagent
+apenas gasta os próprios turnos refazendo lookups que o pai já tinha feito. Mais lento e mais
+caro, com o mesmo resultado. É a Question 13, e o distrator é "aumente `maxTurns`": pagar pelo
+desperdício em vez de removê-lo.
+
+### Checkpoint
+
+1. Por que "o subagent respondeu com confiança" não é evidência de que o briefing foi
+   suficiente?
+2. No fan-out, por que cada worker precisa saber o que os **outros** estão cobrindo, além do
+   próprio recorte?
+3. Qual é a relação entre esta seção e o stateless do Módulo 0 §2?
+
+<details>
+<summary>Ver respostas</summary>
+
+1. Porque a falha deste tópico não tem cara de falha: lacuna de briefing vira suposição
+   plausível, executada com a mesma confiança de um fato. Confiança do worker não mede
+   completude do briefing.
+2. Porque fronteira é bilateral: sem saber o que os vizinhos cobrem, o recorte de cada um
+   se expande até invadir os outros — e a duplicação só aparece na síntese, depois de paga.
+3. É a mesma lei em outro nível: nada existe para o modelo além do que está na requisição
+   (Módulo 0); nada existe para o subagent além do que está no prompt de delegação e no que o
+   harness recarrega do disco (§3). Quem entende uma, reconstrói a outra.
+
+</details>
+
 ### Cenário de prova
 
 *Um orquestrador dispara cinco subagents para pesquisar um mercado e recebe cinco respostas
@@ -840,9 +937,68 @@ nem temperatura do modelo: é ausência de fronteiras explícitas no prompt de d
 correção é dar a cada worker o próprio recorte **e a lista dos recortes alheios**, não aumentar
 o número de workers nem pedir "seja mais criativo".
 
+```text
+1. O sintoma: cinco respostas boas e quase iguais → o problema não é capacidade, é recorte.
+2. Cheque o briefing contra a lista canônica: objetivo idêntico para os cinco, formato ok,
+   fontes ok, fronteira AUSENTE.
+3. Sem fronteira, cada worker escolhe o recorte mais óbvio — e o mais óbvio é o mesmo para
+   todos.
+4. Mais workers multiplicam a duplicação; mais maxTurns aprofunda o recorte errado;
+   deduplicar na síntese paga o desperdício antes de tratá-lo.
+5. Resposta: recorte explícito por worker + a lista do que os outros cobrem.
+```
+
 ---
 
 ## 6. Hooks
+
+Na §2 ficou uma promessa: para regra que não pode falhar, existe algo mais forte que
+`CLAUDE.md`. Este capítulo entrega — e a chave é uma distinção que atravessa a prova inteira:
+**o que é pedido ao modelo pode não acontecer; o que é código do harness acontece sempre.**
+
+### O problema
+
+A equipe escreve no `CLAUDE.md`: "nunca edite arquivos em `infra/prod/`". Funciona por duas
+semanas. Aí uma sessão longa compacta o contexto, ou o modelo simplesmente pondera outras
+instruções — e o arquivo de produção é editado. Ninguém agiu de má fé: **instrução é uma
+solicitação a um gerador probabilístico** (Módulo 0 §1). Ele atende quase sempre. *Quase* é
+exatamente o que uma política de segurança não pode aceitar.
+
+O que falta é um mecanismo que não dependa de o modelo lembrar, concordar ou sequer ver a
+regra: código do harness, executado num ponto fixo do fluxo, decidindo antes de a ação
+acontecer. Lembre do Módulo 0 §3: entre o pedido do modelo (`tool_use`) e a execução há um
+instante em que **a aplicação decide**. O hook é o Claude Code abrindo esse instante para o seu
+código.
+
+### Modelo mental
+
+O ciclo de vida de uma sessão, com os pontos fixos onde hooks penduram código:
+
+```text
+ sessão começa ──────────────────────────── SessionStart
+   │
+   ▼
+ usuário envia prompt ───────────────────── UserPromptSubmit
+   │
+   ▼
+ modelo responde…
+   ├─ pediu tool?  ──── antes de executar ── PreToolUse   ◄─ pode BLOQUEAR
+   │                    executa a tool
+   │                    deu certo ────────── PostToolUse       (já aconteceu)
+   │                    falhou ───────────── PostToolUseFailure
+   ├─ delegou? ──── subagent nasce/termina ─ SubagentStart / SubagentStop
+   │
+   ▼
+ modelo termina o turno ─────────────────── Stop
+   │
+ janela encheu? ─── antes/depois ────────── PreCompact / PostCompact
+   │
+ sessão termina ─────────────────────────── SessionEnd
+```
+
+O desenho já contém a regra mais cobrada do tópico: `PreToolUse` fica **antes** da execução —
+é o único lugar de onde se **impede** alguma coisa. Tudo que fica depois observa, registra,
+reage — mas não desfaz.
 
 ### Definição
 
@@ -863,11 +1019,15 @@ auditoria — é hook. Se é preferência de estilo, é prompt (ou `CLAUDE.md`).
 
 **Quando *não* usar:** quando a regra exige julgamento sobre o conteúdo. Hook é código — casa
 padrões, checa caminhos, roda validadores. "Não edite `infra/prod/`" é hook; "prefira nomes
-descritivos a abreviações" não é, porque não existe script que decida isso.
+descritivos a abreviações" não é, porque não existe script que decida isso. Tentar codificar
+julgamento semântico num hook produz falsos positivos que travam o agente — a escada completa
+é: preferência → prompt/`CLAUDE.md`; regra verificável por código com consequência inaceitável
+→ hook.
 
 ### Eventos
 
-O conjunto de eventos é grande (mais de 30 na versão atual). Os que aparecem em prova:
+O conjunto de eventos é grande (mais de 30 na versão atual). Os que aparecem em prova são os do
+diagrama acima:
 
 | Evento | Dispara |
 |---|---|
@@ -887,10 +1047,17 @@ roda antes e pode impedir a execução; `PostToolUse` roda depois, quando a aç�
 Um hook que precisa *barrar* uma escrita em produção tem de ser `PreToolUse` — em `PostToolUse`
 o arquivo já foi escrito.
 
+Repare também no detalhe que decide questões de auditoria: `PostToolUse` dispara **depois de
+uma tool call ter sucesso** — a falha vai para `PostToolUseFailure`. Um registro que precisa
+cobrir também as execuções que falham não pode morar só em `PostToolUse`.
+
 `SubagentStop` é a resposta certa quando o cenário pede uma ação a cada término de subagent
-(logar, validar, contabilizar) sem depender de o orquestrador lembrar de fazê-lo.
+(logar, validar, contabilizar) sem depender de o orquestrador lembrar de fazê-lo — é o evento
+do ledger de custos da §0.
 
 ### Estrutura e bloqueio
+
+A configuração, com leitura guiada logo abaixo:
 
 ```json
 {
@@ -907,8 +1074,24 @@ o arquivo já foi escrito.
 }
 ```
 
-O `matcher` filtra por nome de ferramenta (aceita `"*"`, lista com `|` e regex). O `type` do
-handler pode ser `command`, `http`, `mcp_tool`, `prompt` ou `agent`.
+**Campo 1 — a chave `"PreToolUse"`.**
+*O que representa:* o evento do ciclo de vida ao qual este grupo de hooks está pendurado.
+*Se estiver errado:* o hook roda no momento errado — o erro clássico é pendurar um gate em
+`PostToolUse` e descobrir que ele "funciona" só depois do estrago.
+
+**Campo 2 — `matcher`.**
+*O que representa:* o filtro de quais tool calls disparam o hook — aqui, as ferramentas `Edit`
+ou `Write`. Aceita `"*"` (todas), lista com `|` e regex.
+*Por que precisamos dele:* sem filtro, o script rodaria para toda tool call da sessão — caro e
+barulhento. O matcher recorta o evento ao que interessa.
+*Se estiver errado (estreito demais):* a ferramenta não listada passa sem inspeção — um matcher
+`Edit` que esquece `Write` deixa metade da porta aberta.
+
+**Campo 3 — `type` e `command`.**
+*O que representam:* o handler. `type: "command"` executa um script local; o `command` é o
+caminho dele. Outros types: `http`, `mcp_tool`, `prompt` e `agent`.
+*Quem o usa:* o harness — o script recebe os detalhes da tool call (ferramenta, argumentos) e
+responde pelo exit code e pelo stdout.
 
 Como o hook decide o destino da ação:
 
@@ -920,6 +1103,10 @@ Como o hook decide o destino da ação:
 - **Outros códigos** — não bloqueiam por si. A ação segue como *non-blocking error*: o transcript
   mostra um aviso `<hook name> hook error` seguido da primeira linha do stderr prefixada por
   `Failed with non-blocking status code:` (o stderr completo só aparece no debug log).
+
+> ⚠️ **Não confunda:** *bloquear* ≠ *reclamar*. Só o exit **2** barra a ação. Exit 1 — o código
+> genérico de erro em shell, que a intuição sugere — deixa a ação **passar**, registrando um
+> aviso. Um gate de segurança escrito com `exit 1` é um gate aberto que gera logs.
 
 Em `PreToolUse` o hook também pode devolver JSON em stdout com
 `hookSpecificOutput.permissionDecision` — e este é o enum a decorar:
@@ -948,6 +1135,37 @@ versionável) · `.claude/settings.local.json` (projeto, gitignored) · managed 
 Para uma regra que **toda a equipe** deve obedecer, a resposta é `.claude/settings.json`
 commitado — não o settings do usuário, que não sai da máquina de quem o escreveu.
 
+### O que acontece se…
+
+**…eu usar `PostToolUse` para um gate de segurança?** O hook roda, detecta, loga — e o arquivo
+de produção já foi escrito, o e-mail já saiu, o registro já foi apagado. Detecção não é
+prevenção: `PostToolUse` reage a um mundo que já mudou. Para reagir ao resultado (formatar o
+arquivo recém-editado, rodar o type-checker sobre o que mudou), ele é a escolha certa; para
+impedir, só `PreToolUse`.
+
+**…a regra que virou hook exigir julgamento?** Falsos positivos: o script não sabe distinguir
+"nome ruim" de "nome bom" e passa a travar edições legítimas. A equipe desliga o hook — e agora
+não há nem a instrução. Regra de julgamento fica em prompt; hook fica com o que um script decide.
+
+### Checkpoint — encontre o erro
+
+Uma equipe configura um hook de compliance: evento `PostToolUse`, matcher `Write`, script que
+sai com `exit 1` quando o arquivo escrito contém segredos.
+
+1. Há **dois** erros de mecânica — quais?
+2. Corrigidos os dois, que registro esse hook ainda perderia?
+
+<details>
+<summary>Ver respostas</summary>
+
+1. Evento errado: `PostToolUse` roda depois — o segredo já foi escrito; para impedir, o evento
+   é `PreToolUse`. Exit code errado: `1` não bloqueia (é non-blocking error); o código de
+   bloqueio é **2**.
+2. Mesmo em `PreToolUse` com exit 2, o matcher `Write` não cobre `Edit` — uma edição que
+   insere o segredo num arquivo existente passaria. O matcher precisa ser `Edit|Write`.
+
+</details>
+
 ### Cenário de prova
 
 *Uma equipe adiciona ao `CLAUDE.md`: "nunca edite arquivos em `infra/prod/`". Duas semanas
@@ -956,9 +1174,49 @@ probabilística — ainda por cima sujeita a se perder na compaction. A resposta
 `PreToolUse` com matcher `Edit|Write` que sai com código 2 quando o caminho casa com
 `infra/prod/`. "Reforçar a redação da regra" e "repetir a regra no prompt" são os distratores.
 
+```text
+1. A regra é verificável por código (um caminho casa ou não casa) e a consequência da
+   violação é inaceitável → perfil de hook, não de instrução.
+2. Precisa IMPEDIR, não detectar → evento PreToolUse (antes da execução).
+3. As ferramentas que escrevem: Edit e Write → matcher "Edit|Write".
+4. Bloqueio: exit 2 (ou permissionDecision: deny) — exit 1 não bloqueia.
+5. Distratores: negrito no CLAUDE.md e regra por caminho continuam sendo texto
+   probabilístico; PostToolUse com log detecta com o dano já feito.
+```
+
 ---
 
 ## 7. Decomposição de tarefas
+
+As três seções anteriores entregaram peças: o subagent (§3, o mecanismo), o fan-out (§4, o
+paralelismo) e o briefing (§5, o canal). Este capítulo é a pergunta que vem **antes** de todas
+elas: dada uma tarefa grande, **onde cortar** — e quando não cortar.
+
+### O problema
+
+"Migre o serviço de autenticação para OAuth2." Grande demais para um fôlego só — algum corte
+vai acontecer. Mas cortes diferentes produzem sistemas radicalmente diferentes: cortar por
+arquivo produz seis workers pisando no mesmo schema (a §4 já mostrou como isso termina); cortar
+por fase produz um pipeline; não cortar nada produz uma sessão que a compaction vai mastigar
+(§2). E há um modo de falha mais sutil que qualquer um desses: cortar em pedaços que **ninguém
+sabe conferir** — cada pedaço volta "pronto", o orquestrador incorpora tudo, e a incerteza,
+em vez de dividida, foi multiplicada.
+
+Precisamos de critérios de corte — e são três.
+
+### Modelo mental
+
+Pense em cada corte candidato como uma linha tracejada, e faça três perguntas sobre **cada
+pedaço** que a linha cria:
+
+```text
+            ┌── o pedaço roda sem o resultado dos outros?   (independência)
+  pedaço ───┼── consome muito contexto e devolve pouco?     (tamanho de contexto)
+            └── dá para conferir que ele terminou certo?    (verificabilidade)
+```
+
+Três sins: o pedaço é candidato a subagent — e, se todos os pedaços forem mutuamente
+independentes, a fan-out. Um não em qualquer pergunta muda o desenho, não a convicção.
 
 ### Definição
 
@@ -967,30 +1225,73 @@ separadamente. Não é o mesmo que delegar: dá para decompor em fases sequencia
 contexto, sem subagent nenhum. A pergunta de desenho é **onde cortar**, e é ela que os três
 critérios abaixo respondem.
 
+> ⚠️ **Não confunda:** *decompor* ≠ *delegar* ≠ *paralelizar*. Decompor é desenhar os cortes;
+> delegar é dar um pedaço a um subagent (§3); paralelizar é rodar pedaços ao mesmo tempo (§4).
+> Toda paralelização pressupõe decomposição, mas uma decomposição pode ser 100% sequencial e
+> 100% no contexto principal — e ainda assim ser a decomposição certa.
+
 ### Quando usar
 
-**Os três critérios para quebrar.**
+**Os três critérios para quebrar**, cada um com o seu teste:
 
 **1. Independência.** A subtarefa pode ser executada sem o resultado das outras? Se sim, ela é
 candidata a fan-out. Se não, ela é um estágio de pipeline sequencial — ainda pode valer a pena
 separar, mas não paraleliza.
+✅ resumir cada fonte de uma pesquisa · ❌ "migrar a parte 3 de 6" do mesmo schema.
 
 **2. Tamanho de contexto.** A subtarefa consome muito contexto e devolve pouco? Esse é o perfil
 ideal para subagent (ler 200 arquivos, devolver 3 achados). O perfil inverso — pouco contexto
 consumido, muita saída — não compensa o round-trip.
+✅ auditar logs e devolver 3 anomalias · ❌ renderizar o relatório final no template (entra
+pouco, sai tudo — e o resultado volta inteiro para a janela do pai de qualquer jeito).
 
 **3. Verificabilidade.** Existe um critério objetivo para dizer que esta subtarefa terminou
 certo? Se não existe, a decomposição só **espalha** a incerteza: o orquestrador recebe um
 resultado que não consegue avaliar e o incorpora como premissa. Subtarefa não verificável é
 onde o erro entra no sistema sem alarme.
+✅ "o extrato valida contra o schema" · ❌ "reescreva esta seção de copy para ficar melhor"
+(melhor segundo quem? — é a Question 15).
 
 O terceiro critério é o mais esquecido e o mais cobrado. Decompor uma tarefa em pedaços que
 ninguém sabe conferir aumenta o número de pontos de falha sem aumentar a confiança no todo.
+O passo a passo do erro sem alarme, porque ele é a assinatura do cenário:
 
-**Quando *não* decompor.** Quando as fases compartilham muito contexto (o custo de repassar o contexto supera o ganho),
-quando a tarefa é pequena, e quando o resultado de cada pedaço não é verificável de forma
-independente. Decomposição tem custo fixo: escrever briefing autossuficiente, pagar round-trip,
-sintetizar. Abaixo de certo tamanho, o custo fixo domina.
+```text
+1. o pedaço volta "pronto" — bem escrito, no formato pedido
+2. não há critério para conferi-lo → o orquestrador não confere (não teria como)
+3. o resultado vira premissa da síntese
+4. a síntese sai coerente e ninguém consegue dizer se melhorou ou piorou
+   — o erro entrou sem disparar nada, e é a verificação da §1 falhando em escala
+```
+
+**Quando *não* decompor.** Quando as fases compartilham muito contexto (o custo de repassar o
+contexto supera o ganho), quando a tarefa é pequena, e quando o resultado de cada pedaço não é
+verificável de forma independente. Decomposição tem custo fixo: escrever briefing
+autossuficiente (§5), pagar round-trip (§3), sintetizar. Abaixo de certo tamanho, o custo fixo
+domina.
+
+### Checkpoint — arquitetura
+
+Para cada tarefa, diga **qual critério** decide o desenho e qual é o desenho:
+
+1. Extrair três campos de 50.000 notas fiscais com layout idêntico.
+2. "Melhorar o texto de onboarding" dividido em cinco reescritas paralelas, uma por seção.
+3. Investigar um incidente: ler 340 logs, achar as assinaturas de erro, propor o fix de uma
+   linha, aplicá-lo.
+
+<details>
+<summary>Ver respostas</summary>
+
+1. Pegadinha: não é caso de decomposição agêntica nenhuma — layout fixo e campos conhecidos
+   pedem chamada única com saída estruturada + validação por schema (a verificabilidade já vem
+   do schema). Decompor em subagents por campo paga custo fixo sem comprar nada (Question 9).
+2. Verificabilidade quebra o plano: não há critério objetivo para "reescrita melhorou". A
+   independência até passa; o desenho falha no critério 3 (Question 15).
+3. Corte por perfil de contexto: a leitura dos 340 logs é o pedaço com funil forte (muito
+   entra, pouco sai) → subagent. O fix de uma linha fica no contexto principal — pequeno
+   demais para pagar round-trip (§3).
+
+</details>
 
 ### Cenário de prova
 
@@ -1002,9 +1303,55 @@ defensável aqui é **sequencial e por fase** (levantar chamadas existentes → 
 fluxo → migrar → verificar), com o levantamento inicial — que é leitura ampla e resumo curto —
 sendo o único pedaço que cabe em fan-out.
 
+```text
+1. Aplique os três critérios ao corte proposto (seis partes paralelas do mesmo serviço).
+2. Independência: falha — mesmo código, mesmo schema, estado compartilhado (§4).
+3. Verificabilidade: falha — "migrou certo" só se confere com o sistema inteiro de pé.
+4. Dois critérios quebrados condenam o DESENHO; objeções de custo (15×) ou de eficiência
+   (cada subagent redescobre as call sites) são reais, mas têm conserto — desenho errado
+   não tem. A objeção mais forte é sempre a de correção.
+5. Redesenho: fases sequenciais, com fan-out só no levantamento (funil de contexto forte).
+```
+
 ---
 
 ## 8. Escalonamento para humano
+
+Todas as seções até aqui foram sobre fazer o agente decidir melhor. Esta é sobre a outra
+metade da arquitetura: reconhecer **quais decisões não são do agente** — e devolvê-las a um
+humano sem destruir o trabalho no caminho. É a `escalate_to_human` do sistema de suporte
+(Módulo 0 §3) deixando de ser um nome numa lista e virando desenho.
+
+### O problema
+
+O agente de suporte da Corujita encontra um pedido de reembolso que duas regras válidas puxam
+para lados opostos. O que um sistema mal desenhado faz aqui é uma de duas coisas ruins:
+**decide sozinho** (escolhe uma regra, emite o reembolso — uma decisão de política tomada por
+quem não tem autoridade para isso, em cima de uma ação sem desfazer) ou **desiste mal** (devolve
+"não consegui" e o humano recomeça a investigação do zero, sem saber o que o agente já apurou).
+
+Escalonamento bem feito é a terceira via: parar no ponto certo, **pelos gatilhos certos**, e
+entregar ao humano um pacote pronto para decidir — não um pedido de socorro.
+
+### Modelo mental
+
+```text
+                 o agente encontra um obstáculo
+                            │
+        ┌───────────────────┴────────────────────┐
+        │ é falha de EXECUÇÃO?                   │ é falta de AUTORIDADE
+        │ (timeout, 429, erro com                │ ou de BASE?
+        │  informação nova)                      │ (irreversível, conflito de
+        ▼                                        ▼  requisitos, sem confiança)
+   retry COM hipótese nova                  ESCALAR — com o dossiê pronto:
+   (backoff para transitórios;              objetivo, o que já foi feito,
+   se a tentativa seguinte seria            onde travou, as opções com
+   idêntica, não é retry,                   tradeoffs, e o estado salvo
+   é repetição)                             fora da sessão
+```
+
+A bifurcação inteira cabe numa pergunta: **o que falta é execução ou é decisão?** Falta de
+execução se tenta de novo (com conteúdo novo); falta de decisão se devolve a quem pode decidir.
 
 ### Definição
 
@@ -1012,7 +1359,11 @@ Escalonamento é interromper a execução automática e devolver a decisão a um
 "desistir": é reconhecer que a decisão seguinte não é do agente. O que separa um escalonamento
 bom de um ruim é se o humano recebe um pacote pronto para decidir ou um "não consegui".
 
-**Os quatro gatilhos.**
+**Os quatro gatilhos** — antes da tabela, o fio que os une: em todos eles, *continuar
+executando não produz uma resposta melhor*, só uma mais confiante ou mais cara. Baixa confiança:
+executar vira chute. Irreversibilidade: o custo de errar não tem volta, então a margem de erro
+aceitável é do dono do sistema, não do agente. Conflito: escolher um lado é legislar. Falha
+repetida: sem hipótese nova, a próxima tentativa é a anterior com outro carimbo.
 
 | Gatilho | O que é | Por que o agente não resolve sozinho |
 |---|---|---|
@@ -1035,13 +1386,28 @@ perguntas:
 Um corolário útil: **conflito de requisitos nunca é resolvido por retry.** Não é falha de
 execução, é ambiguidade de especificação, e nenhuma quantidade de tentativas a desfaz.
 
+Os dois lados, porque a prova sempre planta um deles no cenário:
+
+✅ **Retry — `lookup_order` devolve HTTP 503 duas vezes.** Falha transitória de infraestrutura:
+nada irreversível aconteceu, e a mesma tentativa mais tarde tende a funcionar (a "hipótese nova"
+é o tempo). Retry com backoff; escalar aqui converte um soluço de rede em intervenção humana.
+
+❌ **Retry — o reembolso com regras em conflito.** Não há o que "tentar de novo": a informação
+que falta não está no sistema, está com quem define a política. E a ação é irreversível — o
+pior lugar do mundo para insistência automática.
+
+> ⚠️ **Não confunda:** *falha repetida do agente* (mesma abordagem, sem hipótese nova → escale)
+> ≠ *falha transitória do ambiente* (503, timeout, 429 → retry com backoff). "Falhou duas
+> vezes" não decide nada por si — o que decide é **de quem** é a falha e **se a próxima
+> tentativa tem conteúdo novo**. Contagem de tentativas é a isca clássica do tópico.
+
 ### Calibração de confiança
 
 A confiança declarada pelo modelo não é acurácia — ver o Domínio 5. Consequência para este
 domínio: um gate de escalonamento que confia só no auto-relato do agente ("estou 90% confiante")
 é um gate fraco. Gatilhos robustos são objetivos: a ação está numa lista de operações
 irreversíveis; o validador falhou N vezes; duas fontes discordam; um campo obrigatório ficou
-nulo.
+nulo. (É a mesma lição da §1: sinal que vem do próprio modelo não é verificação.)
 
 ### Como escalar preservando o estado
 
@@ -1056,8 +1422,34 @@ bem entrega um **pacote de handoff**:
 5. **O estado durável**, num scratchpad externo, para que a retomada não dependa da sessão.
 
 O ponto arquitetural: o estado tem de sobreviver ao fim da sessão. Se ele só existe na janela de
-contexto, a escalada perde tudo assim que a sessão fecha — é para isso que serve o scratchpad
-externo (Domínio 5).
+contexto, a escalada perde tudo assim que a sessão fecha (§2: a janela não é lugar de guardar
+nada que precise durar).
+
+> **Guarde este ponto:** o *scratchpad externo* — estado em arquivo, fora da janela — é um
+> mecanismo do Domínio 5, onde ele também resolve a preservação de fatos exatos através de
+> resumos. Aqui basta a ideia: durável é o que está fora da sessão.
+
+### Checkpoint
+
+1. "O agente deve escalar após 3 tentativas falhas" — o que há de errado com essa regra?
+2. Um agente precisa apagar 2 milhões de registros órfãos de produção. Quantas tentativas antes
+   de escalar?
+3. O que um bom pacote de handoff tem que um "não consegui, passando para vocês" não tem?
+
+<details>
+<summary>Ver respostas</summary>
+
+1. Contagem não é critério. Um 503 na 3ª tentativa ainda pede backoff; um conflito de
+   requisitos na 1ª já pedia humano; uma ação irreversível pedia humano na tentativa ZERO.
+   Os critérios são irreversibilidade e existência de hipótese nova.
+2. Zero — escala antes da primeira. Ação irreversível de alto impacto: o agente prepara tudo
+   (a query, a contagem, o plano de rollback impossível — que é o ponto) e a execução é
+   decisão humana.
+3. Os cinco itens: objetivo original, o que já foi feito e verificado, o ponto exato do trave
+   (literal), as opções com tradeoffs, e o estado salvo fora da sessão. O humano decide em
+   minutos em vez de reinvestigar por horas.
+
+</details>
 
 ### Cenário de prova
 
@@ -1070,9 +1462,86 @@ Os distratores fortes são "aplicar a regra mais restritiva" e "aplicar a regra 
 (VIP)": os dois **decidem pelo humano** uma questão de política que o agente não tem autoridade
 para fechar.
 
+```text
+1. Identifique os gatilhos no cenário: duas instruções válidas em conflito (janela de 30
+   dias vs. nota VIP) + ação irreversível (emitir dinheiro).
+2. Conflito de requisitos não é falha de execução → retry não resolve, por definição.
+3. "Regra mais restritiva" e "regra mais específica" parecem prudência e método — mas ambas
+   SÃO decisões de política, tomadas por quem não tem autoridade para legislar.
+4. Resposta: escalate_to_human com o dossiê (valor, as duas regras, as duas leituras) —
+   decidir É do humano; preparar a decisão é do agente.
+```
+
+---
+
+## 9. Reconstrução — o sistema inteiro de novo
+
+Volte ao diagrama da §0. Ele não mudou; você mudou. A mesma execução, recontada agora com o
+**critério** de cada decisão — que é exatamente o que a prova pede que você reconheça:
+
+O usuário pede o relatório checado contra as fontes. O orquestrador **decompõe em quatro
+estágios** porque os três critérios da §7 mandam: os estágios têm fronteiras verificáveis
+(fontes levantadas; resumos prontos; relatório escrito; checagem batida) e perfis de contexto
+distintos. Dos quatro, **só o estágio 2 vira fan-out** — o teste da §4 é dependência de estado,
+e resumir fontes é o raro caso de itens mutuamente independentes; os estágios 1→3→4 se
+encadeiam por dados, e nenhum "tamanho" muda isso. Cada resumo roda num **subagent** porque o
+funil da §3 é forte: uma fonte inteira entra, um resumo de uma página volta, e a janela do
+orquestrador não vê o trabalho sujo. Cada briefing é **autossuficiente** (§5): recorte próprio,
+os recortes alheios, formato de saída — porque nada do que o orquestrador sabe atravessa por
+outro canal, e a falha de fronteira produziria cinco respostas iguais fingindo consenso. O
+registro de custo por subagent mora num **hook `SubagentStop`** (§6): precisa acontecer para
+todos, inclusive os que falham, e registro não é preferência de estilo — é código no ciclo de
+vida, não pedido no prompt. O estágio 4 — checar o relatório contra as fontes — é o **verify
+results** da §1: ground truth documental, não auto-avaliação; sem ele, isto seria um workflow
+com aparência de agente. E quando a checagem encontra duas fontes em contradição numa afirmação
+central, o agente **escala** (§8): conflito não se resolve por retry, e o handoff leva o dossiê
+— a afirmação, as duas fontes, as duas leituras — com o estado salvo fora da sessão, que (§2)
+não é lugar de guardar o que precisa durar.
+
+Se você consegue recontar esse parágrafo de memória — decisão por critério, não por moda — o
+domínio está pronto para o checkpoint de questões.
+
+---
+
+## O que você precisa realmente entender
+
+Não é resumo do texto; são os modelos mentais que precisam estar de pé:
+
+1. **Verificação com ground truth é o que separa agente de workflow.** Sinal objetivo que o
+   modelo não controla — e medindo a propriedade certa, senão é falsa confiança (§1).
+2. **A janela é um orçamento; a sessão é um arquivo.** Compaction perde primeiro as instruções
+   antigas; regra permanente mora onde recarrega (`CLAUDE.md`, system prompt) (§2).
+3. **Subagent é um funil de contexto, não um turbo.** Vale quando muito entra e pouco volta;
+   inverte em tarefas pequenas ou dependentes da conversa (§3).
+4. **Paralelismo é uma pergunta sobre dependência de estado — nunca sobre tamanho.** Duas
+   formas de dependência, dois sintomas: serialização escondida (lentidão) e escrita
+   compartilhada (não-determinismo sem erro) (§4).
+5. **O prompt de delegação é o único canal.** Objetivo, formato, fontes, fronteiras (com os
+   recortes alheios) e os fatos que o pai já tem — o que não estiver escrito não existe (§5).
+6. **Instrução é probabilística; hook é determinístico.** A escada histórico < `CLAUDE.md` <
+   hook, com `PreToolUse` + exit 2 como o único degrau que impede (§6).
+7. **Decisão que não é do agente volta para o humano — com dossiê.** Irreversibilidade e
+   hipótese nova decidem; contagem de tentativas nunca; conflito de requisitos escala sempre
+   (§7 dá os cortes, §8 devolve a decisão).
+
+## Se você lembrar apenas de 3 coisas
+
+1. **Todo critério deste domínio é uma propriedade do cenário, não uma preferência**:
+   dependência de estado (paralelizar?), razão consumo/devolução de contexto (delegar?),
+   consequência da omissão (hook?), irreversibilidade + hipótese nova (escalar?).
+2. **Nada atravessa fronteiras de contexto sozinho** — nem entre chamadas (stateless), nem
+   entre sessões, nem do pai para o subagent. O que precisa estar do outro lado precisa ser
+   escrito ou recarregado do disco.
+3. **O que não pode falhar não se pede — se codifica**: verificação com ground truth no loop,
+   hook no ciclo de vida, gatilhos objetivos de escalonamento.
+
 ---
 
 ## Mapa rápido de decisão
+
+A tabela abaixo é o domínio inteiro comprimido em seis linhas — cada resposta é o critério de
+um `### Quando usar`. Uso recomendado: na véspera da prova, cubra a coluna da direita e enuncie
+o critério de cada linha; a linha que você não reconstruir aponta a seção a reler.
 
 | Pergunta do cenário | O que decide |
 |---|---|
@@ -1082,3 +1551,7 @@ para fechar.
 | Sessão nova ou resume? | A tarefa nova depende do que foi estabelecido antes? |
 | Escalar ou tentar de novo? | A ação é reversível? A tentativa tem hipótese nova? |
 | Decompor ou não? | Cada pedaço é independente, econômico em contexto **e** verificável? |
+
+**Próximo assunto:** [`armadilhas.md`](./armadilhas.md) — as distinções deste domínio em forma
+de flashcard — e, quando as oito seções estiverem firmes, o
+[lab](./lab/README.md) e as [20 questões](./questions.md) que fecham o domínio.
