@@ -39,7 +39,16 @@ ferramentas na prática usa os `### Checkpoint` do módulo como autoteste rápid
 ## Próximo passo
 
 Executar a Task 3 do plano: Domínio 2 — Claude Code Configuration & Workflows (20%), com
-`notas.md`, `armadilhas.md`, o lab de configuração e as 20 questões.
+`notas.md`, `armadilhas.md`, o lab de configuração e as 20 questões — **já sob o template
+didático** (itens 8–12 do template de módulo; o Domínio 1 reescrito é o modelo de referência).
+
+> Revisão pedagógica de 2026-09-22 entregue (plano em
+> [`docs/superpowers/plans/2026-09-22-revisao-pedagogica.md`](./docs/superpowers/plans/2026-09-22-revisao-pedagogica.md)):
+> novo Módulo 0 de fundamentos (o ciclo `tool_use` ensinado do zero), `notas.md` do Domínio 1
+> reescrito no arco problema → modelo mental → definição → checkpoint → cenário (com visão
+> geral, reconstrução e resumos finais), glossário com os termos de fundamentos, e o template
+> de módulo do plano mestre atualizado para os Domínios 2–5 nascerem nesse formato. Nenhuma
+> célula da tabela muda — armadilhas, lab e questões do Domínio 1 seguem os mesmos.
 
 > Task 11 entregue: `npm run build` gera o site de leitura (ver "Ler como site" abaixo). Os
 > Domínios 2–5 já nascem renderizáveis, sem mexer no gerador. Nenhuma célula de domínio muda —
