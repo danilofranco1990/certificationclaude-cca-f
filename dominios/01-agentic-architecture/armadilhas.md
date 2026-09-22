@@ -4,6 +4,11 @@ Distinções que a prova cobra em cenário. Cada entrada traz **o critério que 
 opções e **o cenário em que a escolha se inverte** — porque decorar "subagent é bom" reprova:
 a questão vai descrever justamente o caso em que ele é ruim.
 
+Cada entrada é o par "⚠️ Não confunda" de [`notas.md`](./notas.md) em forma de flashcard: a
+teoria mora lá (o `§N` no fim de cada entrada), e o `### Checkpoint` da seção correspondente é o
+aquecimento natural para este baralho. Método de uso em
+[`COMO-ESTUDAR.md`](../../COMO-ESTUDAR.md) §2.
+
 ---
 
 ### Subagente com contexto isolado vs. continuar no contexto principal

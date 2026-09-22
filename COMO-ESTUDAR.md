@@ -4,6 +4,12 @@
 o método de uso de cada um dos quatro artefatos que todo domínio produz. Sem isso, o repositório
 vira material de leitura, e ler material de prova é a forma mais confortável de não aprendê-lo.
 
+Antes de qualquer domínio vem o [Módulo 0 — Fundamentos](./dominios/00-fundamentos/notas.md),
+que se estuda pelo método da seção 1 abaixo, com uma adaptação: ele não tem banco de questões,
+então o que faz as vezes de checkpoint são os `### Checkpoint` do próprio texto (respondidos
+por escrito, antes de abrir o `<details>`) e o teste da folha de papel — desenhar de memória o
+ciclo request → `tool_use` → execução → `tool_result` → `end_turn`.
+
 | Artefato | Arquivo | Método | Está dominado quando |
 |---|---|---|---|
 | Notas | `dominios/NN-*/notas.md` | leitura ativa | você reproduz o critério de `### Quando usar` de memória |
@@ -19,17 +25,26 @@ ao reler é só familiaridade com a página, e a prova não mostra a página.
 
 ## 1. Notas — leitura ativa
 
-O arquivo é `dominios/NN-<dominio>/notas.md`. Toda seção `## N` tem a mesma forma: abre em
-`### Definição`, tem um `### Quando usar` no meio e fecha em `### Cenário de prova`. Entre eles
-podem existir subseções de mecânica (`### Eventos`, `### Estrutura e bloqueio`, `### Os números`).
-Essa estrutura fixa é o que torna o método abaixo executável em qualquer domínio.
+O arquivo é `dominios/NN-<dominio>/notas.md`. Todo `notas.md` abre com uma `## 0. A visão geral`
+(uma execução completa em que as seções aparecem juntas) e fecha com uma reconstrução e os
+resumos finais. No meio, toda seção `## N` tem a mesma forma: abre no problema e no modelo
+mental (`### O problema`, `### Modelo mental`), formaliza em `### Definição`, decide em
+`### Quando usar` e fecha em `### Checkpoint` + `### Cenário de prova`. Entre elas existem
+subseções de mecânica (`### Eventos`, `### Estrutura e bloqueio`, `### Os números`) e blocos de
+alerta (`⚠️ Não confunda`, `O que acontece se…`, `Guarde este ponto`). Essa estrutura fixa é o
+que torna o método abaixo executável em qualquer domínio.
 
-O ciclo, uma seção `## N` por sessão:
+O ciclo, uma seção `## N` por sessão (leia a `## 0` antes da primeira seção e a reconstrução
+depois da última — elas são a moldura, não conteúdo opcional):
 
-1. **Leia a seção inteira**, do `### Definição` ao `### Cenário de prova`.
+1. **Leia a seção inteira**, do problema ao `### Cenário de prova` — mas **pare no
+   `### Checkpoint`** e responda as perguntas por escrito antes de abrir o `<details>` de
+   respostas. O checkpoint é a primeira medição, com o arquivo ainda aberto.
 2. **Feche o arquivo.** Não minimize, feche — o custo de reabrir é o que impede a olhadinha.
 3. **Escreva de memória, em uma frase, o critério de `### Quando usar`.** Depois escreva a resposta
-   do `### Cenário de prova` e, principalmente, *qual critério a decide*.
+   do `### Cenário de prova` e, principalmente, *qual critério a decide*. Se a seção tem um
+   `### Modelo mental` com diagrama, desenhe-o de memória numa folha — o teste do papel: quem
+   não desenha o fluxo ainda não tem o modelo, só a familiaridade com a página.
 4. **Abra e compare.**
 
 O que conta como falha na comparação: você escreveu uma **definição** onde devia ter escrito um
@@ -48,9 +63,11 @@ cenário inteiro pode girar em torno de `exit 2` bloquear, de o terceiro valor s
 `request`, ou de multiagente custar ~15× os tokens de um chat. Esses são os itens que se decoram
 palavra por palavra; o resto se entende.
 
-Se a sessão for curta, as três subseções fixas são as inegociáveis: `### Definição` situa,
-`### Quando usar` decide, `### Cenário de prova` é a questão já mastigada. As subseções de mecânica
-no meio são o que transforma acerto em acerto consistente — mas nessa ordem.
+Se a sessão for curta, as subseções inegociáveis são quatro: `### Modelo mental` monta o desenho,
+`### Definição` situa, `### Quando usar` decide, `### Cenário de prova` é a questão já mastigada.
+As subseções de mecânica no meio são o que transforma acerto em acerto consistente — mas nessa
+ordem. (`### O problema` se lê uma vez e não se revisa: o problema, uma vez visto, não se
+"desvê".)
 
 ---
 
