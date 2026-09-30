@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ciclo tool_use — simulador</title>
+<meta name="description" content="Simulador interativo: o que a aplicação faz depois de receber stop_reason tool_use da Messages API — 1 ou 2 tool_use, erro com is_error, continuação end_turn ou nova rodada.">
+<style>
+  :root {
+    --ground:  #F6F7F9;
+    --surface: #FFFFFF;
+    --ink:     #15181D;
+    --muted:   #5C6470;
+    --rule:    #DFE3E9;
+    --accent:  #0F5C57;
+    --code-bg: #EFF1F4;
+    --err:     #B42318;
+    --model:   #5B3FBF;
+    --app:     #0F5C57;
+    --tools:   #B7650F;
+    --mat:     #1D4ED8;
+    --doc:     #047857;
+    --sim:     #C2410C;
+    --hl:      rgba(15, 92, 87, .16);
+    --hl-line: rgba(15, 92, 87, .10);
+    --scheme:  light;
+    color-scheme: var(--scheme);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #101317;
+      --surface: #171B21;
+      --ink:     #E6E9EE;
+      --muted:   #98A2B0;
+      --rule:    #262C35;
+      --accent:  #4FB3A6;
+      --code-bg: #1E242C;
+      --err:     #F87171;
+      --model:   #A78BFA;
+      --app:     #4FB3A6;
+      --tools:   #F0A34D;
+      --mat:     #7FA6FF;
+      --doc:     #4ADE80;
+      --sim:     #FB923C;
+      --hl:      rgba(79, 179, 166, .24);
+      --hl-line: rgba(79, 179, 166, .12);
+      --scheme:  dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:  #101317;
+    --surface: #171B21;
+    --ink:     #E6E9EE;
+    --muted:   #98A2B0;
+    --rule:    #262C35;
+    --accent:  #4FB3A6;
+    --code-bg: #1E242C;
+    --err:     #F87171;
+    --model:   #A78BFA;
+    --app:     #4FB3A6;
+    --tools:   #F0A34D;
+    --mat:     #7FA6FF;
+    --doc:     #4ADE80;
+    --sim:     #FB923C;
+    --hl:      rgba(79, 179, 166, .24);
+    --hl-line: rgba(79, 179, 166, .12);
+    --scheme:  dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; padding: 16px;
+    background: var(--ground); color: var(--ink);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  code, pre, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, "Courier New", monospace; }
+  code { font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .panel, .warnbox, .sub, .legend, .kbd, footer, td, th, li, p { overflow-wrap: anywhere; min-width: 0; }
+  h1 { font-size: 1.45rem; line-height: 1.25; margin: 0 0 6px; }
+  h2 { font-size: 1.05rem; margin: 0 0 8px; }
+  h3 { font-size: .95rem; margin: 14px 0 6px; }
+  p { margin: 0 0 10px; }
+  ul { margin: 0 0 10px; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  .sub { color: var(--muted); margin-bottom: 10px; }
+  .warnbox { border: 1px dashed var(--sim); border-radius: 8px; padding: 8px 12px; font-size: .9rem; margin: 8px 0 12px; background: var(--surface); }
+
+  .tag { display: inline-block; font-size: .68rem; line-height: 1.4; padding: 0 7px; border-radius: 999px; border: 1px solid; margin-left: 4px; vertical-align: middle; white-space: nowrap; font-family: system-ui, sans-serif; font-weight: 600; letter-spacing: .01em; }
+  .t-mat { color: var(--mat); border-color: var(--mat); }
+  .t-doc { color: var(--doc); border-color: var(--doc); }
+  .t-sim { color: var(--sim); border-color: var(--sim); border-style: dashed; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: .85rem; color: var(--muted); align-items: center; }
+  .legend .tag { margin-left: 0; }
+
+  .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; }
+  .panel + .panel { margin-top: 14px; }
+
+  /* controles */
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 10px; }
+  .btn { font: inherit; font-size: .9rem; padding: 7px 13px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .btn:hover:not(:disabled) { border-color: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; min-width: 96px; }
+  .controls select { font: inherit; font-size: .9rem; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); }
+  .progress { font-size: .88rem; color: var(--muted); margin-left: auto; }
+  .kbd { font-size: .78rem; color: var(--muted); }
+
+  .timeline { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin: 4px 0 10px; }
+  .tl { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--rule); background: var(--surface); cursor: pointer; padding: 0; position: relative; }
+  .tl.past { background: var(--rule); }
+  .tl.cur { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 3px var(--hl); }
+  .tl.dec { border-radius: 4px; transform: rotate(45deg); border-color: var(--sim); }
+  .tl.dec.open { border-style: dashed; }
+  .tl.dec.past, .tl.dec.cur { background: var(--sim); border-color: var(--sim); }
+  .tl.end { border-radius: 3px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .85rem; color: var(--muted); margin-bottom: 10px; }
+  .chip-dec { font: inherit; font-size: .82rem; padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--sim); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .chip-dec b { color: var(--sim); }
+  .chip-dec.open { opacity: .7; }
+
+  /* grid */
+  .grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); gap: 14px; align-items: start; }
+  @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+  .col { min-width: 0; }
+
+  /* palco */
+  .stage-wrap { overflow-x: auto; }
+  .stage-wrap svg { width: 100%; min-width: 620px; display: block; }
+  .stage-why { font-size: .82rem; color: var(--muted); margin-top: 8px; }
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 4 4; }
+  .lane rect { fill: var(--code-bg); stroke: var(--rule); stroke-width: 1.5; }
+  .lane.cur rect { stroke: var(--accent); stroke-width: 3; }
+  .lane text { fill: var(--ink); font-weight: 700; font-size: 15px; }
+  .lane .cap { font-weight: 400; font-size: 11.5px; fill: var(--muted); }
+  .lane.model text:not(.cap) { fill: var(--model); }
+  .lane.app text:not(.cap) { fill: var(--app); }
+  .lane.tools text:not(.cap) { fill: var(--tools); }
+  .arrow { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+  .arrow.cur { stroke: var(--accent); stroke-width: 3; }
+  .arrow.err { stroke: var(--err); stroke-dasharray: 7 4; }
+  .lbl { font-size: 12px; fill: var(--muted); }
+  .lbl.cur { fill: var(--ink); font-weight: 700; font-size: 12.5px; }
+  .lbl.err { fill: var(--err); }
+  .note rect { fill: var(--surface); stroke: var(--rule); stroke-width: 1.5; }
+  .note text { font-size: 12px; fill: var(--muted); }
+  .note.cur rect { stroke: var(--accent); stroke-width: 3; }
+  .note.cur text { fill: var(--ink); font-weight: 700; }
+  .note.dec rect { stroke: var(--sim); stroke-dasharray: 5 3; }
+  .note.dec text { fill: var(--sim); }
+  .note.end rect { fill: var(--code-bg); }
+
+  /* etapa */
+  .stephead { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+  .stepno { font-weight: 600; }
+  .actor { padding: 1px 9px; border-radius: 999px; color: #fff; font-weight: 600; font-size: .75rem; }
+  .a-model { background: var(--model); } .a-app { background: var(--app); } .a-tools { background: var(--tools); }
+  .badge-dec { color: var(--sim); font-weight: 700; }
+  .explain p { margin-bottom: 8px; }
+  .explain .note { font-size: .9rem; color: var(--muted); }
+  .decision { border: 1px dashed var(--sim); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .dprompt { font-weight: 600; margin-bottom: 8px; }
+  .dopts { display: flex; flex-direction: column; gap: 6px; }
+  .opt { font: inherit; text-align: left; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .opt small { display: block; color: var(--muted); font-size: .8rem; }
+  .opt:hover { border-color: var(--sim); }
+  .opt.sel { border-color: var(--sim); background: var(--hl-line); box-shadow: inset 0 0 0 1px var(--sim); }
+  .opt.sel::before { content: "✓ "; color: var(--sim); font-weight: 700; }
+  .dwait { color: var(--sim); font-size: .88rem; margin: 8px 0 0; font-weight: 600; }
+  .dok { color: var(--muted); font-size: .85rem; margin: 8px 0 0; }
+
+  /* dados */
+  pre.json { background: var(--code-bg); padding: 12px; border-radius: 8px; overflow: auto; font-size: .78rem; line-height: 1.5; max-height: 460px; margin: 0; }
+  pre.json .k { color: var(--ink); font-weight: 600; }
+  pre.json .s { color: var(--model); }
+  pre.json .n { color: var(--tools); }
+  pre.json mark { background: var(--hl); color: inherit; border-radius: 3px; padding: 0 2px; }
+  pre.json .k.hl { background: var(--hl); border-radius: 3px; padding: 0 2px; }
+  .data-cap { font-size: .8rem; color: var(--muted); margin: 6px 0 0; }
+  .data-title { font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+
+  /* estado */
+  table.state { width: 100%; border-collapse: collapse; font-size: .86rem; }
+  table.state th, table.state td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  table.state th { color: var(--muted); font-weight: 500; width: 44%; }
+  table.state td.chg { background: var(--hl-line); }
+
+  /* histórico */
+  .hist-meta { font-size: .85rem; color: var(--muted); margin-bottom: 8px; }
+  .msg { border: 1px solid var(--rule); border-left-width: 5px; border-radius: 6px; padding: 8px 10px; margin: 6px 0; background: var(--surface); }
+  .msg.user { border-left-color: var(--app); }
+  .msg.assistant { border-left-color: var(--model); }
+  .msg.new { box-shadow: 0 0 0 2px var(--accent); }
+  .msg .role { font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 4px; display: flex; gap: 8px; align-items: center; }
+  .msg.user .role { color: var(--app); } .msg.assistant .role { color: var(--model); }
+  .msg .role .idx { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+  .msg .role .newtag { color: var(--accent); font-weight: 700; text-transform: none; letter-spacing: 0; }
+  .blk { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .76rem; margin: 3px 0; padding: 4px 7px; background: var(--code-bg); border-radius: 4px; word-break: break-word; }
+  .blk.err { border: 1px dashed var(--err); }
+  .blk .bt { color: var(--muted); }
+  .chip { display: inline-block; padding: 0 7px; border-radius: 999px; color: #fff; background: var(--c, #666); font-size: .72rem; font-weight: 600; margin-right: 4px; }
+  .iserr { color: var(--err); font-weight: 700; }
+  .empty { color: var(--muted); font-style: italic; font-size: .9rem; }
+
+  /* referência */
+  .ref { margin-top: 18px; }
+  .ref h2 { margin-top: 6px; }
+  table.ref-t { width: 100%; border-collapse: collapse; font-size: .86rem; margin-bottom: 8px; }
+  table.ref-t th, table.ref-t td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  table.ref-t th { color: var(--muted); font-weight: 600; }
+  details { margin: 8px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 960px) { .two { grid-template-columns: 1fr; } }
+  footer { color: var(--muted); font-size: .82rem; margin: 18px 0 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Depois de <code>stop_reason: "tool_use"</code>: o que a aplicação faz em seguida</h1>
+  <p class="sub">Simulador do ciclo <em>requisição → <code>tool_use</code> → execução → <code>tool_result</code> → continuação</em> na Messages API, com <b>modelo/API</b>, <b>aplicação</b> e <b>ferramentas</b> separados. Recorte do Módulo 0 (§3 Ferramentas e §4 Agent loop), cenário da loja Corujita.</p>
+  <div class="warnbox">🧪 <b>Esta simulação não faz chamadas reais.</b> Todos os JSONs são exemplos construídos para o estudo; ids como <code>toolu_01LO</code> e os textos do modelo são inventados. O que é fato e o que é hipótese está etiquetado em cada frase:</div>
+  <div class="legend">
+    <span><span class="tag t-mat">material</span> está em <code>dominios/00-fundamentos/notas.md</code></span>
+    <span><span class="tag t-doc">doc oficial</span> confirmado em platform.claude.com em 2026-09-24</span>
+    <span><span class="tag t-sim">simulação</span> hipótese criada para o exemplo — não é comportamento garantido</span>
+  </div>
+</header>
+
+<section class="controls" aria-label="Controles da simulação">
+  <button class="btn primary" id="btn-play">▶ Play</button>
+  <button class="btn" id="btn-prev">◀ Etapa anterior</button>
+  <button class="btn" id="btn-next">Próxima etapa ▶</button>
+  <button class="btn" id="btn-reset">↺ Reiniciar</button>
+  <label>Velocidade
+    <select id="speed" aria-label="Velocidade">
+      <option value="0.5">0,5×</option>
+      <option value="1" selected>1×</option>
+      <option value="2">2×</option>
+      <option value="4">4×</option>
+    </select>
+  </label>
+  <span class="progress" id="progress"></span>
+</section>
+<div class="timeline" id="timeline" aria-label="Linha do tempo das etapas"></div>
+<div class="chips" id="chips"></div>
+<p class="kbd">Atalhos: ← → mudam de etapa · espaço = Play/Pausar · ◆ na linha do tempo = decisão (clique para voltar e trocar)</p>
+
+<main class="grid">
+  <div class="col">
+    <section class="panel">
+      <h2>Palco: quem fala com quem</h2>
+      <div class="stage-wrap" id="stage"></div>
+      <p class="stage-why">Representação escolhida: <b>diagrama de sequência</b>, porque o conceito é um protocolo — a pergunta central é <em>quem escreve cada mensagem e em que ordem</em>. A coluna do meio é o seu código; setas para a esquerda são chamadas HTTP à API, setas para a direita são chamadas locais a ferramentas.</p>
+    </section>
+    <section class="panel">
+      <h2>Histórico <code>messages</code> (o que a aplicação carrega)</h2>
+      <div id="hist"></div>
+    </section>
+  </div>
+  <div class="col">
+    <section class="panel" id="step"></section>
+    <section class="panel">
+      <h2>Dados desta etapa</h2>
+      <div id="data"></div>
+    </section>
+    <section class="panel">
+      <h2>Estado da aplicação</h2>
+      <div id="state"></div>
+    </section>
+    <section class="panel">
+      <h2>Transições possíveis a partir daqui</h2>
+      <div id="trans"></div>
+    </section>
+  </div>
+</main>
+
+<section class="ref">
+  <div class="two">
+    <div class="panel">
+      <h2>Referência técnica breve</h2>
+      <h3><code>stop_reason</code> — o campo de controle <span class="tag t-mat">material</span> <span class="tag t-doc">doc oficial</span></h3>
+      <table class="ref-t">
+        <tr><th>Valor</th><th>Significa</th><th>A aplicação faz</th></tr>
+        <tr><td><code>tool_use</code></td><td>o modelo pediu ferramenta(s) e está esperando</td><td>executa e devolve <code>tool_result</code></td></tr>
+        <tr><td><code>end_turn</code></td><td>resposta completa</td><td>usa o conteúdo; o loop termina</td></tr>
+        <tr><td><code>max_tokens</code></td><td>saída cortada no teto</td><td>trata como incompleta (não executa um <code>tool_use</code> truncado)</td></tr>
+        <tr><td><code>pause_turn</code></td><td>turno longo pausado (server tools)</td><td>reenvia a conversa como está</td></tr>
+        <tr><td><code>refusal</code></td><td>recusa por segurança</td><td>não repete cegamente</td></tr>
+      </table>
+      <h3>Blocos <span class="tag t-doc">doc oficial</span></h3>
+      <ul>
+        <li><code>tool_use</code> (escrito pelo <b>modelo</b>, turno <code>assistant</code>): <code>id</code>, <code>name</code>, <code>input</code> conforme o <code>input_schema</code>.</li>
+        <li><code>tool_result</code> (escrito pela <b>aplicação</b>, turno <code>user</code>): <code>tool_use_id</code> (obrigatório), <code>content</code> (opcional: string ou blocos <code>text</code>/<code>image</code>/<code>document</code>), <code>is_error</code> (opcional, <code>true</code> em falha).</li>
+      </ul>
+      <h3>Regras de forma <span class="tag t-doc">doc oficial</span></h3>
+      <ul>
+        <li>A mensagem <code>user</code> com os <code>tool_result</code> vem <b>imediatamente</b> após a mensagem <code>assistant</code> com os <code>tool_use</code>. Nada entre elas.</li>
+        <li>Os <code>tool_result</code> vêm <b>primeiro</b> no <code>content</code>; texto só depois. Texto antes → erro 400.</li>
+        <li>Um <code>tool_result</code> para <b>cada</b> <code>tool_use</code>, todos <b>na mesma</b> mensagem <code>user</code>. Se não executou uma chamada, ainda assim devolva <code>is_error: true</code> com explicação.</li>
+        <li><code>tool_use</code> sem <code>tool_result</code> logo depois → 400: <em>"tool_use ids were found without tool_result blocks immediately after"</em>.</li>
+        <li>Paralelismo é o padrão; <code>tool_choice: {"type":"auto","disable_parallel_tool_use":true}</code> limita a no máximo um <code>tool_use</code> por resposta. Devolver resultados em mensagens <code>user</code> separadas "ensina" o modelo a parar de paralelizar.</li>
+        <li>Reação a <code>is_error</code>: Claude "tipicamente reconhece o erro e tenta outra abordagem ou pede esclarecimento" — comportamento típico, não garantia.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h2>Erros de interpretação frequentes</h2>
+      <ul>
+        <li><b>"O modelo executa a ferramenta."</b> Não. O modelo escreve o pedido (<code>tool_use</code>) e para. Quem executa é a aplicação — sem caminho físico nem permissão para o modelo tocar o banco. <span class="tag t-mat">material</span></li>
+        <li><b>"O <code>tool_result</code> vai num turno <code>assistant</code> ou num papel <code>tool</code>."</b> Vai em <code>role: "user"</code>: tudo que chega ao modelo vem de fora. Não existe papel <code>tool</code> nesta API. <span class="tag t-doc">doc oficial</span></li>
+        <li><b>"Gravo só o texto da resposta no histórico."</b> Perde os blocos <code>tool_use</code>; o <code>tool_use_id</code> fica órfão e a próxima requisição é rejeitada. Grave <code>response.content</code> inteiro. <span class="tag t-mat">material</span></li>
+        <li><b>"Um <code>tool_result</code> por mensagem."</b> Todos na mesma mensagem <code>user</code>, primeiro no <code>content</code>. <span class="tag t-doc">doc oficial</span></li>
+        <li><b>"Se a ferramenta falhou, não devolvo nada / invento um resultado."</b> Devolva <code>is_error: true</code> com a mensagem do erro; silêncio deixa o turno suspenso, invenção engana o modelo. <span class="tag t-mat">material</span></li>
+        <li><b>"A aplicação escolhe quantos <code>tool_use</code> o modelo emite."</b> Quem produz os blocos é o modelo. A aplicação pode no máximo limitar com <code>disable_parallel_tool_use</code>. <span class="tag t-doc">doc oficial</span></li>
+        <li><b>"Mostro o texto que veio com o <code>tool_use</code> como resposta final."</b> O turno está suspenso; o usuário vê "vou consultar…" e nada acontece, para sempre. <span class="tag t-mat">material</span></li>
+        <li><b>"Depois de um erro o modelo sempre tenta de novo."</b> É comportamento típico, não contrato. A continuação depende do modelo, do prompt e do erro. <span class="tag t-doc">doc oficial</span></li>
+      </ul>
+      <details>
+        <summary>Analogia do material: o restaurante (e onde ela falha)</summary>
+        <table class="ref-t">
+          <tr><th>Analogia</th><th>Elemento real</th></tr>
+          <tr><td>Cliente</td><td>usuário</td></tr>
+          <tr><td>Restaurante</td><td>aplicação</td></tr>
+          <tr><td>Garçom</td><td>Claude (o modelo)</td></tr>
+          <tr><td>Comanda</td><td>bloco <code>tool_use</code></td></tr>
+          <tr><td>Cozinha</td><td>a ferramenta (função, banco, API externa)</td></tr>
+          <tr><td>Prato pronto</td><td>bloco <code>tool_result</code></td></tr>
+        </table>
+        <p><b>Onde a analogia deixa de valer</b> <span class="tag t-mat">material</span>: (1) o garçom anda até a cozinha; Claude não vai a lugar nenhum — devolve a comanda na resposta e fica parado, quem "anda" é a aplicação; (2) o garçom lembra da mesa; Claude relê a conversa inteira do zero a cada chamada, porque a API é stateless.</p>
+      </details>
+      <h3>O que ficou fora desta visualização</h3>
+      <p class="sub">Server tools (<code>web_search</code>, <code>code_execution</code>) e <code>pause_turn</code>; <code>tool_choice</code> <code>any</code>/<code>tool</code>; streaming; blocos <code>thinking</code>; tratamento de <code>max_tokens</code> e <code>refusal</code>; Tool Runner dos SDKs; prompt caching; MCP. Tudo isso se apoia neste ciclo — é assunto dos Domínios 1, 3, 4 e 5.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Fontes — material: <code>dominios/00-fundamentos/notas.md</code> §3 "Ferramentas" e §4 "Do ciclo ao agent loop". Documentação oficial consultada em 2026-09-24:
+  <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview">Tool use overview</a>,
+  <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls">Handle tool calls</a>,
+  <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use">Parallel tool use</a>.
+  Gerado por <code>/visualizar-conceito</code>.
+</footer>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const clone = (x) => JSON.parse(JSON.stringify(x));
+
+const T = {
+  mat: '<span class="tag t-mat" title="Fato presente no material (Módulo 0, §3–§4)">material</span>',
+  doc: '<span class="tag t-doc" title="Confirmado na documentação oficial em 2026-09-24">doc oficial</span>',
+  sim: '<span class="tag t-sim" title="Hipótese criada para esta simulação — não é comportamento garantido">simulação</span>',
+};
+
+/* ------------------------------------------------ dados fixos da simulação */
+const MODEL = 'claude-opus-5';
+const USER_TEXT = 'Onde está meu pedido #4411? Meu código de cliente é C-778.';
+const TOOLS = [
+  { name: 'get_customer',
+    description: 'Busca dados cadastrais de um cliente pelo código. Use quando precisar identificar o cliente ou personalizar a resposta.',
+    input_schema: { type: 'object', properties: { customer_id: { type: 'string', description: 'Código do cliente, ex.: C-778' } }, required: ['customer_id'] } },
+  { name: 'lookup_order',
+    description: 'Busca o status atual de um pedido pelo número. Use quando o cliente perguntar sobre entrega, atraso ou situação de um pedido.',
+    input_schema: { type: 'object', properties: { order_id: { type: 'string', description: "Número do pedido, sem o '#'. Ex.: 4411" } }, required: ['order_id'] } },
+];
+const CALL = {
+  get_customer: { id: 'toolu_01GC', retryId: 'toolu_02GC', input: { customer_id: 'C-778' },
+    ok: '{"name":"Ana Souza","tier":"gold","cliente_desde":"2023"}',
+    err: 'CrmError: timeout ao consultar o CRM (5000 ms)', errShort: 'exceção: CrmError' },
+  lookup_order: { id: 'toolu_01LO', retryId: 'toolu_02LO', input: { order_id: '4411' },
+    ok: 'status: despachado em 19/09; transportadora: Loggi; previsão de entrega: 24/09',
+    err: 'DatabaseError: connection timeout after 3000 ms', errShort: 'exceção: DatabaseError' },
+};
+const TOOLS_ABBREV = '[… mesmo catálogo da requisição 1 (get_customer, lookup_order), reenviado inteiro …]';
+
+/* ------------------------------------------------------------ o caminho */
+function buildPath(dec) {
+  const steps = [];
+  const st = { round: 0, messages: [], lastStop: null, pending: [], results: {}, next: 'Montar a requisição inicial', userSees: '(nada ainda — o usuário acabou de perguntar)' };
+  const add = (s) => { s.index = steps.length; s.state = clone(st); s.visuals = s.visuals || []; s.transitions = s.transitions || []; steps.push(s); return s; };
+  const decision = (s) => { const v = dec[s.decision.id]; s.decision.value = v === undefined ? null : v; s.kind = 'decision'; add(s); return v !== undefined; };
+
+  // 0 — visão geral
+  add({ id: 'overview', kind: 'info', actor: null,
+    title: 'Visão geral: três participantes, um protocolo',
+    data: { title: 'Catálogo de ferramentas que a aplicação vai declarar (parâmetro tools)', json: TOOLS, hl: ['name', 'description', 'input_schema'] },
+    explain: `
+      <p>Uma aplicação de suporte recebeu de <code>POST /v1/messages</code> uma resposta com <code>stop_reason: "tool_use"</code>. O que ela faz em seguida? O simulador percorre a resposta certa etapa por etapa, com três participantes separados nas colunas do palco:</p>
+      <ul>
+        <li><b>Modelo / API</b> — recebe a requisição, <em>decide</em> e devolve texto e blocos <code>tool_use</code>. Nunca executa nada. ${T.mat}</li>
+        <li><b>Aplicação</b> — o seu código: monta requisições, lê <code>stop_reason</code>, executa ferramentas e devolve <code>tool_result</code>. ${T.mat}</li>
+        <li><b>Ferramentas</b> — banco, CRM, APIs externas: só a aplicação as alcança. ${T.mat}</li>
+      </ul>
+      <p>Clique em <b>Play</b>. A simulação para sozinha nos pontos de decisão (◆): quantas ferramentas o modelo solicita, se cada execução falha e, após um erro, como o modelo continua. Trocar uma escolha descarta as etapas seguintes do caminho anterior — os dois caminhos nunca se misturam.</p>
+      <p class="note">Nenhuma chamada real é feita; os JSONs são exemplos construídos a partir do Módulo 0 e conferidos com a documentação oficial. ${T.sim}</p>`,
+    transitions: ['Montar a requisição inicial (etapa 1)'] });
+
+  // 1 — monta a requisição 1
+  st.messages.push({ role: 'user', content: USER_TEXT });
+  st.next = 'Enviar POST /v1/messages (rodada 1)';
+  const req1 = { model: MODEL, max_tokens: 1024, tools: TOOLS, messages: clone(st.messages) };
+  add({ id: 'build-req1', kind: 'info', actor: 'app',
+    title: 'A aplicação monta a requisição inicial',
+    visuals: [{ type: 'note', lane: 'app', label: 'monta a requisição 1' }],
+    data: { title: 'Corpo da requisição 1 (POST /v1/messages)', json: req1, hl: ['tools', 'messages', 'role'] },
+    explain: `
+      <p><b>Quem agiu:</b> a aplicação. Ela monta três partes: o <code>model</code>, o catálogo <code>tools</code> — duas ferramentas, cada uma com <code>name</code>, <code>description</code> e <code>input_schema</code> — e o array <code>messages</code>, que por enquanto tem só a pergunta do usuário. ${T.mat}</p>
+      <p>Declarar uma ferramenta <b>não obriga</b> o modelo a usá-la: com <code>tool_choice</code> no padrão <code>auto</code>, usar ou não é decisão dele. ${T.doc}</p>
+      <p>O catálogo é idêntico nos dois cenários da simulação; o que muda adiante é o que o modelo decide fazer com ele. ${T.sim}</p>`,
+    transitions: ['Enviar POST /v1/messages (rodada 1)'] });
+
+  // 2 — envia a requisição 1
+  st.round = 1;
+  st.next = 'Aguardar a resposta e ler stop_reason antes de qualquer outra coisa';
+  add({ id: 'send-req1', kind: 'msg', actor: 'app',
+    title: 'A aplicação envia a requisição 1',
+    visuals: [{ type: 'arrow', from: 'app', to: 'model', label: 'POST /v1/messages · req 1 (pergunta + tools)' }],
+    data: { title: 'O que viaja no fio', json: { endpoint: 'POST https://api.anthropic.com/v1/messages', headers: { 'x-api-key': 'sk-ant-…', 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: '(o corpo da etapa anterior)' }, hl: ['endpoint'] },
+    explain: `
+      <p><b>Quem agiu:</b> a aplicação envia a requisição 1. A API é stateless: tudo que o modelo vai saber está neste corpo — pergunta, catálogo e, mais tarde, o histórico inteiro. ${T.mat}</p>
+      <p><b>O que muda no estado:</b> a rodada 1 do loop começa. A aplicação não faz nada com a resposta antes de ler o <code>stop_reason</code>. ${T.mat}</p>`,
+    transitions: ['Resposta com stop_reason "tool_use" → executar ferramentas (este caminho)', 'Resposta com "end_turn" → exibir ao usuário, sem ferramentas', 'Resposta com "max_tokens" → saída cortada; tratar como incompleta (fora desta simulação)', '"refusal" / "pause_turn" → tratamento próprio (fora desta simulação)'] });
+
+  // 3 — decisão: cenário
+  const ok3 = decision({ id: 'dec-scenario', actor: 'model',
+    title: 'Seletor de cenário: quantas ferramentas o modelo solicita nesta resposta?',
+    visuals: [{ type: 'note', lane: 'model', label: '🧪 seletor: 1 ou 2 blocos tool_use?', cls: 'dec' }],
+    decision: { id: 'scenario', prompt: 'Nesta resposta, o modelo solicita…', options: [
+      { value: '1', label: 'uma ferramenta', hint: 'lookup_order(4411) apenas' },
+      { value: '2', label: 'duas ferramentas na mesma resposta', hint: 'get_customer(C-778) e lookup_order(4411), em paralelo' } ] },
+    explain: `
+      <p><b>Ponto de decisão da simulação.</b> Numa integração real, quem decide quantos blocos <code>tool_use</code> vêm na resposta é o <b>modelo</b>, lendo a pergunta e as descriptions; a aplicação não escolhe esse número. ${T.mat} Por padrão o modelo pode chamar várias ferramentas numa mesma resposta; a aplicação só consegue <em>limitar</em> isso com <code>tool_choice: {"type":"auto","disable_parallel_tool_use":true}</code>. ${T.doc}</p>
+      <p>Aqui você faz o papel do modelo, para comparar os dois caminhos. ${T.sim}</p>`,
+    transitions: ['1 bloco tool_use → uma execução, um tool_result', '2 blocos tool_use → duas execuções, dois tool_result na mesma mensagem user'] });
+  if (!ok3) return steps;
+  const two = dec.scenario === '2';
+  const calls = two ? ['get_customer', 'lookup_order'] : ['lookup_order'];
+
+  // 4 — resposta 1
+  const content1 = [
+    { type: 'text', text: two ? 'Vou verificar seu cadastro e o status do pedido.' : 'Vou consultar o status do seu pedido.' },
+    ...calls.map((n) => ({ type: 'tool_use', id: CALL[n].id, name: n, input: CALL[n].input })),
+  ];
+  const resp1 = { id: 'msg_01R1', type: 'message', role: 'assistant', model: MODEL, content: content1, stop_reason: 'tool_use', stop_sequence: null, usage: { input_tokens: 412, output_tokens: two ? 96 : 64 } };
+  st.lastStop = 'tool_use';
+  st.next = 'Ler stop_reason; gravar response.content; extrair os blocos tool_use';
+  add({ id: 'resp1', kind: 'msg', actor: 'model',
+    title: 'A API responde com stop_reason: "tool_use"',
+    visuals: [{ type: 'arrow', from: 'model', to: 'app', label: `resposta 1 · stop_reason: tool_use · ${calls.length} tool_use` }],
+    data: { title: 'Corpo da resposta 1', json: resp1, hl: ['role', 'stop_reason', 'type=tool_use', 'id', 'name', 'input'] },
+    explain: `
+      <p><b>Quem agiu:</b> o modelo. A resposta tem <code>role: "assistant"</code>, um bloco <code>text</code> e ${calls.length === 1 ? 'um bloco' : 'dois blocos'} <code>tool_use</code>, cada um com <code>id</code> (<code>toolu_…</code>), <code>name</code> e <code>input</code> montado conforme o <code>input_schema</code>. ${T.doc}</p>
+      ${two ? `<p>Os dois pedidos são independentes (cadastro e pedido), por isso vieram juntos: chamadas em paralelo são o padrão. ${T.doc}</p>` : ''}
+      <p><code>stop_reason: "tool_use"</code> é o campo de controle: o modelo <b>parou de propósito</b> porque precisa da aplicação. O texto que veio junto não é a resposta final. ${T.mat}</p>
+      <p><b>Nada aconteceu no mundo ainda.</b> <code>tool_use</code> é uma solicitação escrita pelo modelo; a execução é da aplicação, no próximo passo. ${T.mat}</p>`,
+    transitions: ['Correto: gravar response.content inteiro e extrair os tool_use', 'Erro comum: exibir o texto ao usuário e parar → turno suspenso para sempre', 'Erro comum: reenviar a mesma requisição → o modelo pede a ferramenta de novo', 'Erro comum: esperar a API executar → ela nunca executa tools declaradas pela aplicação'] });
+
+  // 5 — lê os blocos
+  st.messages.push({ role: 'assistant', content: clone(content1) });
+  st.pending = calls.map((n) => CALL[n].id);
+  st.next = `Executar ${calls.length === 1 ? 'a ferramenta pedida' : 'as duas ferramentas pedidas'} — código da aplicação`;
+  add({ id: 'read-blocks', kind: 'info', actor: 'app',
+    title: 'A aplicação grava a resposta no histórico e extrai os blocos tool_use',
+    visuals: [{ type: 'note', lane: 'app', label: 'grava response.content; extrai tool_use' }],
+    data: { title: 'Blocos tool_use extraídos (pendentes de execução)', json: { pendentes: calls.map((n) => ({ id: CALL[n].id, name: n, input: CALL[n].input })) }, hl: ['id', 'name', 'input'] },
+    explain: `
+      <p><b>Quem agiu:</b> a aplicação, em duas ações: (1) grava <code>response.content</code> <b>inteiro</b> no histórico como turno <code>assistant</code> — texto e <code>tool_use</code> juntos; (2) extrai de cada bloco <code>tool_use</code> o <code>name</code>, o <code>id</code> e o <code>input</code>. ${T.doc}</p>
+      <p><b>Por que inteiro:</b> o <code>tool_result</code> da próxima etapa referencia o <code>id</code> deste bloco. Quem grava só o texto quebra o elo, e a API rejeita a requisição seguinte. ${T.mat}</p>
+      <p><b>Estado:</b> ${calls.length} pedido(s) pendente(s). A próxima ação é executar — código seu, na sua infraestrutura, onde moram validação do <code>input</code>, permissão e log. ${T.mat}</p>`,
+    transitions: ['Executar cada tool_use (validar input, checar permissão, logar)', 'Recusar a execução → ainda assim devolver tool_result com is_error: true e a razão'] });
+
+  // 6.. — por ferramenta: decisão + execução
+  let i = 0;
+  for (const n of calls) {
+    i++;
+    const c = CALL[n];
+    const argShown = Object.values(c.input)[0];
+    const okd = decision({ id: 'dec-' + n, actor: 'tools',
+      title: `Execução de ${n}: sucesso ou erro?`,
+      visuals: [{ type: 'note', lane: 'tools', label: `🧪 ${n}: sucesso ou erro?`, cls: 'dec' }],
+      decision: { id: 'out:' + n, prompt: `Ao executar ${n}(${JSON.stringify(c.input)}), a ferramenta…`, options: [
+        { value: 'ok', label: 'responde com sucesso', hint: c.ok },
+        { value: 'err', label: 'falha (lança exceção)', hint: c.err } ] },
+      explain: `
+        <p><b>Ponto de decisão da simulação.</b> A execução acontece na aplicação — não é chamada à API. É aqui que moram validação, permissão, log… e as falhas de infraestrutura. ${T.mat}</p>
+        <p>O simulador deixa você escolher o resultado para ver como cada caso vira <code>tool_result</code>. ${T.sim}</p>`,
+      transitions: ['Sucesso → tool_result com o retorno em content', 'Falha → tool_result com is_error: true e a mensagem do erro em content'] });
+    if (!okd) return steps;
+    const isErr = dec['out:' + n] === 'err';
+    st.results[c.id] = { name: n, content: isErr ? c.err : c.ok, is_error: isErr };
+    const remaining = calls.length - i;
+    st.next = remaining > 0 ? `Executar a próxima ferramenta (${calls[i]})` : 'Montar os tool_result numa única mensagem user';
+    add({ id: 'exec-' + n, kind: 'msg', actor: 'app',
+      title: `A aplicação executa ${n} — ${isErr ? 'a ferramenta falha' : 'a ferramenta responde'}`,
+      visuals: [
+        { type: 'arrow', from: 'app', to: 'tools', label: `${n}(${argShown})` },
+        { type: 'arrow', from: 'tools', to: 'app', label: isErr ? c.errShort : 'retorno', cls: isErr ? 'err' : '' } ],
+      data: { title: 'Chamada e retorno (dentro da aplicação — não é chamada à API)', json: isErr ? { chamada: { name: n, input: c.input }, excecao: c.err } : { chamada: { name: n, input: c.input }, retorno: c.ok }, hl: ['name', 'input', 'retorno', 'excecao'] },
+      explain: isErr ? `
+        <p><b>Quem agiu:</b> a aplicação chamou <code>${n}(${esc(JSON.stringify(c.input))})</code> e a ferramenta lançou uma exceção. ${T.sim}</p>
+        <p><b>O que a aplicação não deve fazer:</b> silenciar (o turno fica suspenso) ou inventar um resultado. O contrato é devolver a falha como <code>tool_result</code> com <code>is_error: true</code> e uma mensagem útil — o que deu errado e o que tentar a seguir. ${T.doc}</p>` : `
+        <p><b>Quem agiu:</b> a aplicação chama <code>${n}(${esc(JSON.stringify(c.input))})</code> na ferramenta — código seu rodando contra o banco/CRM, não uma chamada à API. ${T.mat}</p>
+        <p><b>Dados que saíram:</b> o <code>input</code> montado pelo modelo (o cliente escreveu <code>#4411</code>; o modelo normalizou para <code>"4411"</code> seguindo a description do campo). <b>Dados que entraram:</b> o retorno da ferramenta, em texto/JSON, que ainda precisa voltar para o modelo. ${T.mat}</p>`,
+      transitions: remaining > 0 ? [`Executar ${calls[i]} (o outro pedido da mesma resposta)`] : ['Montar um tool_result por pedido, todos numa única mensagem user'] });
+  }
+
+  // 7 — monta os tool_result
+  const results = calls.map((n) => { const r = st.results[CALL[n].id]; const b = { type: 'tool_result', tool_use_id: CALL[n].id, content: r.content }; if (r.is_error) b.is_error = true; return b; });
+  const anyErr = results.some((r) => r.is_error);
+  st.messages.push({ role: 'user', content: clone(results) });
+  st.pending = [];
+  st.next = 'Enviar a requisição 2 com o histórico completo';
+  add({ id: 'build-results', kind: 'info', actor: 'app',
+    title: `A aplicação monta ${results.length === 1 ? 'o tool_result' : 'os dois tool_result'} numa única mensagem user`,
+    visuals: [{ type: 'note', lane: 'app', label: `monta ${results.length} tool_result numa msg user` }],
+    data: { title: 'Nova mensagem user (entra no histórico)', json: { role: 'user', content: results }, hl: ['role', 'type=tool_result', 'tool_use_id', 'is_error', 'content'] },
+    explain: `
+      <p><b>Quem agiu:</b> a aplicação monta <b>uma única</b> mensagem <code>user</code> com um bloco <code>tool_result</code> por <code>tool_use</code>, cada um com o <code>tool_use_id</code> copiado do <code>id</code> do pedido — compare as cores dos chips no histórico. ${T.doc}</p>
+      <p>Por que <code>role: "user"</code>: tudo que chega ao modelo vem "de fora", e o lado de fora fala com <code>user</code> — seja o humano, seja a aplicação entregando um resultado. ${T.mat}</p>
+      ${anyErr ? `<p>O resultado com falha vai com <code>is_error: true</code> e o texto do erro em <code>content</code>; o outro campo não muda de forma. ${T.doc}</p>` : ''}
+      ${two ? `<p>Regras de forma: os <code>tool_result</code> vêm <b>primeiro</b> no <code>content</code> (texto só depois deles) e <b>todos juntos</b> — resultados separados em várias mensagens <code>user</code> "ensinam" o modelo a parar de paralelizar. ${T.doc}</p>` : `<p>Regra de forma: o <code>tool_result</code> vem primeiro no <code>content</code>; texto adicional só depois dele. ${T.doc}</p>`}`,
+    transitions: ['Enviar a requisição 2: histórico completo + esta mensagem'] });
+
+  // 8 — envia a requisição 2
+  st.round = 2;
+  st.next = 'Aguardar a resposta e ler stop_reason de novo (o loop repete)';
+  const req2 = { model: MODEL, max_tokens: 1024, tools: TOOLS_ABBREV, messages: clone(st.messages) };
+  add({ id: 'send-req2', kind: 'msg', actor: 'app',
+    title: 'A aplicação envia a requisição 2: histórico completo + tool_result',
+    visuals: [{ type: 'arrow', from: 'app', to: 'model', label: 'POST /v1/messages · req 2 (histórico + tool_result)' }],
+    data: { title: 'Corpo da requisição 2 (tools abreviado na exibição; a requisição real repete o catálogo inteiro)', json: req2, hl: ['messages', 'role', 'id', 'tool_use_id', 'is_error'] },
+    explain: `
+      <p><b>Quem agiu:</b> a aplicação envia o histórico <b>completo</b>: a pergunta, o turno <code>assistant</code> com os <code>tool_use</code> e, <b>imediatamente depois</b>, a mensagem <code>user</code> com os <code>tool_result</code>. Nada pode ficar entre esses dois turnos. ${T.doc}</p>
+      <p>Confira no JSON: cada <code>tool_use_id</code> da mensagem <code>user</code> casa com um <code>id</code> do turno <code>assistant</code> anterior. Um <code>tool_use</code> sem <code>tool_result</code> logo depois gera erro 400 ("tool_use ids were found without tool_result blocks immediately after"). ${T.doc}</p>
+      <p><b>Estado:</b> rodada 2 do loop. O catálogo <code>tools</code> vai de novo — a API não guardou nada da rodada 1. ${T.mat}</p>`,
+    transitions: ['"end_turn" → resposta final ao usuário; loop encerra', '"tool_use" de novo → nova rodada: executar, devolver, reenviar', '400 se algum tool_use ficou sem tool_result imediatamente depois, ou se houver texto antes dos tool_result'] });
+
+  // 9 — continuação após erro (decisão) ou end_turn direto
+  let cont = 'end_turn';
+  if (anyErr) {
+    const failedNames = calls.filter((n) => st.results[CALL[n].id].is_error);
+    const okc = decision({ id: 'dec-cont', actor: 'model',
+      title: 'Continuação após o erro: como o modelo responde? (exemplo simulado)',
+      visuals: [{ type: 'note', lane: 'model', label: '🧪 continuação: end_turn ou nova rodada?', cls: 'dec' }],
+      decision: { id: 'cont', prompt: `O modelo leu o tool_result com is_error: true (${failedNames.join(', ')}). Nesta simulação, ele…`, options: [
+        { value: 'end_turn', label: 'responde ao usuário explicando a falha (end_turn)', hint: 'o loop termina nesta rodada' },
+        { value: 'retry', label: 'tenta de novo: novo tool_use, nova rodada', hint: 'a aplicação repete o mesmo tratamento; a nova execução tem sucesso (fixado pela simulação)' } ] },
+      explain: `
+        <p><b>Exemplo simulado, não comportamento garantido.</b> A documentação diz que, ao receber um <code>tool_result</code> com <code>is_error: true</code>, Claude "tipicamente reconhece o erro e tenta outra abordagem ou pede esclarecimento". ${T.doc} O que ele fará de fato depende do modelo, do prompt e do erro. ${T.sim}</p>
+        <p>Escolha qual dos dois desfechos plausíveis observar — os dois exercitam a mesma regra: a aplicação lê o <code>stop_reason</code> e age conforme ele. ${T.mat}</p>`,
+      transitions: ['end_turn → o texto explica a falha; a aplicação exibe e encerra', 'tool_use → um novo bloco com id novo; a aplicação executa e devolve tool_result de novo'] });
+    if (!okc) return steps;
+    cont = dec.cont;
+  }
+
+  if (cont === 'retry') {
+    const failed = calls.filter((n) => st.results[CALL[n].id].is_error);
+    const content2 = [
+      { type: 'text', text: failed.length === 1 ? 'O sistema não respondeu; vou tentar novamente.' : 'Os sistemas não responderam; vou tentar novamente.' },
+      ...failed.map((n) => ({ type: 'tool_use', id: CALL[n].retryId, name: n, input: CALL[n].input })),
+    ];
+    const resp2 = { id: 'msg_01R2', type: 'message', role: 'assistant', model: MODEL, content: content2, stop_reason: 'tool_use', stop_sequence: null, usage: { input_tokens: 560, output_tokens: 58 } };
+    st.lastStop = 'tool_use';
+    st.next = 'Ler stop_reason; gravar response.content; extrair os blocos tool_use (igual à rodada 1)';
+    add({ id: 'resp2', kind: 'msg', actor: 'model',
+      title: 'A API responde com stop_reason: "tool_use" de novo — começa a rodada 2 (exemplo simulado)',
+      visuals: [{ type: 'arrow', from: 'model', to: 'app', label: `resposta 2 · stop_reason: tool_use · ${failed.length} tool_use` }],
+      data: { title: 'Corpo da resposta 2', json: resp2, hl: ['stop_reason', 'type=tool_use', 'id', 'name'] },
+      explain: `
+        <p><b>Quem agiu:</b> o modelo responde de novo com <code>stop_reason: "tool_use"</code>: um novo bloco <code>tool_use</code> com <b>id novo</b> (<code>${esc(CALL[failed[0]].retryId)}</code>) para a ferramenta que falhou. ${T.sim}</p>
+        <p>Isso inicia a <b>rodada 2</b> do agent loop. A aplicação não tem tratamento especial para "segunda vez": lê o <code>stop_reason</code> e faz exatamente o que fez na rodada 1. ${T.mat}</p>
+        <p>O <code>id</code> anterior continua no histórico com seu <code>tool_result</code> de erro; ele não é reaproveitado. ${T.doc}</p>`,
+      transitions: ['Gravar response.content; executar o novo tool_use', 'Erro comum: tratar como resposta final porque "já teve uma rodada"'] });
+
+    st.messages.push({ role: 'assistant', content: clone(content2) });
+    st.pending = failed.map((n) => CALL[n].retryId);
+    st.next = 'Executar de novo — código da aplicação';
+    add({ id: 'read-blocks-2', kind: 'info', actor: 'app',
+      title: 'A aplicação grava a resposta 2 e extrai o novo tool_use',
+      visuals: [{ type: 'note', lane: 'app', label: 'grava response.content; extrai tool_use' }],
+      data: { title: 'Blocos tool_use extraídos (rodada 2)', json: { pendentes: failed.map((n) => ({ id: CALL[n].retryId, name: n, input: CALL[n].input })) }, hl: ['id', 'name'] },
+      explain: `<p>Mesma regra da rodada 1: <code>response.content</code> inteiro no histórico, e o <code>id</code> novo vira o <code>tool_use_id</code> do próximo <code>tool_result</code>. ${T.mat}</p>`,
+      transitions: ['Executar o tool_use pendente'] });
+
+    for (const n of failed) {
+      const c = CALL[n];
+      st.results[c.retryId] = { name: n, content: c.ok, is_error: false };
+      st.next = 'Montar o tool_result (rodada 2)';
+      add({ id: 'exec2-' + n, kind: 'msg', actor: 'app',
+        title: `A aplicação executa ${n} de novo — desta vez responde (fixado pela simulação)`,
+        visuals: [ { type: 'arrow', from: 'app', to: 'tools', label: `${n}(${Object.values(c.input)[0]}) · 2ª tentativa` }, { type: 'arrow', from: 'tools', to: 'app', label: 'retorno' } ],
+        data: { title: 'Chamada e retorno (rodada 2)', json: { chamada: { name: n, input: c.input }, retorno: c.ok }, hl: ['retorno'] },
+        explain: `<p>Para encerrar o exemplo, a segunda execução tem sucesso. ${T.sim} Nada impede que falhasse de novo — a aplicação devolveria outro <code>is_error: true</code>, e um loop real precisa de um limite de iterações para não girar para sempre. ${T.mat}</p>`,
+        transitions: ['Montar o tool_result numa mensagem user'] });
+    }
+
+    const results2 = failed.map((n) => ({ type: 'tool_result', tool_use_id: CALL[n].retryId, content: CALL[n].ok }));
+    st.messages.push({ role: 'user', content: clone(results2) });
+    st.pending = [];
+    st.next = 'Enviar a requisição 3 com o histórico completo';
+    add({ id: 'build-results-2', kind: 'info', actor: 'app',
+      title: 'A aplicação monta o tool_result da rodada 2',
+      visuals: [{ type: 'note', lane: 'app', label: `monta ${results2.length} tool_result numa msg user` }],
+      data: { title: 'Nova mensagem user (rodada 2)', json: { role: 'user', content: results2 }, hl: ['tool_use_id', 'content'] },
+      explain: `<p>O <code>tool_use_id</code> agora aponta para o <b>id novo</b>. O histórico passa a ter dois pares pedido↔resultado para a mesma ferramenta: o que falhou e o que funcionou. Ambos ficam — a API valida a correspondência de cada um. ${T.doc}</p>`,
+      transitions: ['Enviar a requisição 3'] });
+
+    st.round = 3;
+    st.next = 'Aguardar a resposta e ler stop_reason';
+    add({ id: 'send-req3', kind: 'msg', actor: 'app',
+      title: 'A aplicação envia a requisição 3: histórico completo (agora com 5 mensagens)',
+      visuals: [{ type: 'arrow', from: 'app', to: 'model', label: 'POST /v1/messages · req 3 (histórico completo)' }],
+      data: { title: 'Corpo da requisição 3 (tools abreviado na exibição)', json: { model: MODEL, max_tokens: 1024, tools: TOOLS_ABBREV, messages: clone(st.messages) }, hl: ['messages', 'tool_use_id', 'is_error'] },
+      explain: `<p>Terceira chamada, mesmo formato. O histórico cresce a cada rodada — e custa tokens de entrada a cada reenvio. ${T.mat}</p>`,
+      transitions: ['"end_turn" → resposta final', '"tool_use" → rodada 3 (o loop continuaria)'] });
+  }
+
+  // 10 — resposta final end_turn
+  const latest = (n) => { const c = CALL[n]; return st.results[c.retryId] || st.results[c.id]; };
+  const lookupOk = latest('lookup_order') && !latest('lookup_order').is_error;
+  const custOk = two ? (latest('get_customer') && !latest('get_customer').is_error) : null;
+  let ftext;
+  if (lookupOk) {
+    ftext = (custOk ? 'Boa notícia, Ana: ' : 'Boa notícia: ') + 'seu pedido #4411 foi despachado em 19/09 pela Loggi, com previsão de entrega para 24/09.';
+    if (two && !custOk) ftext += ' Não consegui carregar seu cadastro agora, mas isso não afeta a consulta do pedido.';
+  } else {
+    ftext = 'Não consegui consultar seu pedido #4411 agora: o sistema de pedidos não respondeu. Pode tentar novamente em alguns minutos?';
+    if (two && custOk) ftext += ' Seu cadastro está em dia, Ana — assim que o sistema voltar, eu confirmo o status.';
+  }
+  const respFinal = { id: st.round === 3 ? 'msg_01R3' : 'msg_01R2', type: 'message', role: 'assistant', model: MODEL, content: [{ type: 'text', text: ftext }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: st.round === 3 ? 640 : 520, output_tokens: 48 } };
+  st.lastStop = 'end_turn';
+  st.messages.push({ role: 'assistant', content: clone(respFinal.content) });
+  st.userSees = ftext;
+  st.next = 'Exibir o texto ao usuário; encerrar o loop';
+  add({ id: 'resp-final', kind: 'msg', actor: 'model',
+    title: `A API responde com stop_reason: "end_turn"${anyErr && cont === 'end_turn' ? ' — explicando a falha (exemplo simulado)' : ''}`,
+    visuals: [{ type: 'arrow', from: 'model', to: 'app', label: `resposta ${st.round} · stop_reason: end_turn` }],
+    data: { title: `Corpo da resposta ${st.round}`, json: respFinal, hl: ['role', 'stop_reason', 'text'] },
+    explain: `
+      <p><b>Quem agiu:</b> o modelo. Com os resultados no contexto, ele produz a resposta final: <code>stop_reason: "end_turn"</code>, só texto, nenhum <code>tool_use</code> pendente. ${T.mat} O texto exato é um exemplo construído. ${T.sim}</p>
+      <p><code>end_turn</code> é a condição de parada do loop: agora sim o texto vai para o usuário. ${T.mat}</p>
+      ${anyErr && cont === 'end_turn' ? `<p>Repare: o modelo <em>leu</em> o erro e o incorporou na resposta — foi para isso que a aplicação devolveu <code>is_error: true</code> em vez de silenciar. ${T.doc}</p>` : ''}`,
+    transitions: ['Exibir a resposta ao usuário; loop encerrado', 'Próxima mensagem do usuário → nova requisição carregando todo o histórico'] });
+
+  // 11 — fim
+  add({ id: 'end', kind: 'info', actor: 'app',
+    title: 'Fim do turno: a aplicação exibe a resposta e o loop encerra',
+    visuals: [{ type: 'note', lane: 'app', label: 'exibe ao usuário · loop encerrado', cls: 'end' }],
+    data: { title: 'O que o usuário vê', json: { usuario_ve: ftext, chamadas_a_api: st.round, mensagens_no_historico: st.messages.length }, hl: ['usuario_ve'] },
+    explain: `
+      <p>Resumo do que a aplicação fez desde o <code>stop_reason: "tool_use"</code>: (1) gravou <code>response.content</code> inteiro; (2) executou cada <code>tool_use</code> ela mesma; (3) devolveu um <code>tool_result</code> por pedido, numa única mensagem <code>user</code>, casando <code>tool_use_id</code>; (4) reenviou o histórico completo; (5) leu o novo <code>stop_reason</code> — e repetiu tudo quando foi <code>tool_use</code> de novo. ${T.mat}</p>
+      <p>Use <b>Etapa anterior</b> ou os ◆ da linha do tempo para voltar a uma decisão e percorrer outro caminho; ou <b>Reiniciar</b>.</p>`,
+    transitions: ['Nova mensagem do usuário → messages cresce e o ciclo recomeça (rodada 1 de um novo turno)'] });
+
+  return steps;
+}
+
+/* ------------------------------------------------------- estado da UI */
+let decisions = {};
+let path = buildPath(decisions);
+let cur = 0;
+let playing = false;
+let timer = null;
+let speed = 1;
+const BASE_MS = 2400;
+const unresolved = (s) => s.kind === 'decision' && decisions[s.decision.id] === undefined;
+
+function choose(step, value) {
+  for (const s of path) if (s.kind === 'decision' && s.index > step.index) delete decisions[s.decision.id];
+  decisions[step.decision.id] = value;
+  path = buildPath(decisions);
+  cur = Math.min(step.index, path.length - 1);
+  renderAll();
+}
+function goto(i) { cur = Math.max(0, Math.min(i, path.length - 1)); renderAll(); }
+function next() { if (!unresolved(path[cur]) && cur < path.length - 1) { cur++; renderAll(); } }
+function prev() { if (cur > 0) { cur--; renderAll(); } }
+function tick() {
+  if (unresolved(path[cur]) || cur >= path.length - 1) { pause(); return; }
+  cur++; renderAll();
+  if (unresolved(path[cur]) || cur >= path.length - 1) pause();
+}
+function play() { if (playing) return; if (unresolved(path[cur]) || cur >= path.length - 1) { renderControls(); return; } playing = true; timer = setInterval(tick, BASE_MS / speed); renderControls(); }
+function pause() { playing = false; if (timer) clearInterval(timer); timer = null; renderControls(); }
+function reset() { pause(); decisions = {}; path = buildPath(decisions); cur = 0; renderAll(); }
+function setSpeed(v) { speed = v; if (playing) { pause(); play(); } }
+
+/* ------------------------------------------------------------ render */
+const LANE_X = { model: 150, app: 450, tools: 750 };
+const ACTOR = { model: 'Modelo / API', app: 'Aplicação', tools: 'Ferramentas' };
+const DEC_LABEL = { scenario: 'cenário', 'out:get_customer': 'get_customer', 'out:lookup_order': 'lookup_order', cont: 'continuação' };
+const DEC_VALUE = { scenario: { '1': '1 tool_use', '2': '2 tool_use' }, 'out:get_customer': { ok: 'sucesso', err: 'erro' }, 'out:lookup_order': { ok: 'sucesso', err: 'erro' }, cont: { end_turn: 'end_turn', retry: 'nova rodada' } };
+
+function renderControls() {
+  const s = path[cur];
+  const atEnd = cur >= path.length - 1;
+  $('#btn-play').textContent = playing ? '❚❚ Pausar' : '▶ Play';
+  $('#btn-prev').disabled = cur === 0;
+  $('#btn-next').disabled = atEnd || unresolved(s);
+  let p = `Etapa ${cur} de ${path.length - 1}`;
+  if (unresolved(s)) p += ' · pausado: aguardando sua escolha';
+  else if (atEnd && s.id === 'end') p += ' · fim do caminho';
+  else if (atEnd) p += ' · o caminho continua após a escolha';
+  else if (playing) p += ' · reproduzindo';
+  $('#progress').textContent = p;
+}
+
+function renderTimeline() {
+  $('#timeline').innerHTML = path.map((s) => {
+    const cls = ['tl', s.kind === 'decision' ? 'dec' : '', s.id === 'end' ? 'end' : '', s.index < cur ? 'past' : '', s.index === cur ? 'cur' : '', unresolved(s) ? 'open' : ''].filter(Boolean).join(' ');
+    return `<button class="${cls}" data-go="${s.index}" title="Etapa ${s.index}: ${esc(s.title)}" aria-label="Etapa ${s.index}: ${esc(s.title)}"></button>`;
+  }).join('');
+}
+
+function renderChips() {
+  const decs = path.filter((s) => s.kind === 'decision');
+  let h = '<span>Caminho atual:</span>';
+  for (const s of decs) {
+    const v = decisions[s.decision.id];
+    const label = DEC_LABEL[s.decision.id] || s.decision.id;
+    const val = v === undefined ? '— (pendente)' : (DEC_VALUE[s.decision.id] || {})[v] || v;
+    h += `<button class="chip-dec ${v === undefined ? 'open' : ''}" data-go="${s.index}" title="Voltar à etapa ${s.index} para trocar">◆ ${esc(label)}: <b>${esc(val)}</b></button>`;
+  }
+  if (!decs.length) h += '<span>nenhuma decisão ainda</span>';
+  $('#chips').innerHTML = h;
+}
+
+function renderStage() {
+  const step = path[cur];
+  const rows = [];
+  for (let i = 1; i <= cur; i++) for (const v of path[i].visuals) rows.push({ v, i });
+  const headH = 84, rowH = 46;
+  const H = Math.max(230, headH + 24 + rows.length * rowH + 20);
+  const lanes = [['model', 'Modelo / API', 'decide; escreve tool_use'], ['app', 'Aplicação', 'seu código; executa'], ['tools', 'Ferramentas', 'banco, CRM, APIs externas']];
+  let s = `<svg viewBox="0 0 900 ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama de sequência das etapas até a atual">`;
+  s += '<defs>';
+  for (const [id, color] of [['m', 'var(--muted)'], ['mc', 'var(--accent)'], ['me', 'var(--err)']]) {
+    s += `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:${color}"/></marker>`;
+  }
+  s += '</defs>';
+  for (const [k, name, cap] of lanes) {
+    const x = LANE_X[k];
+    s += `<line class="life" x1="${x}" y1="${headH}" x2="${x}" y2="${H}"/>`;
+    s += `<g class="lane ${k} ${step.actor === k ? 'cur' : ''}"><rect x="${x - 125}" y="10" width="250" height="60" rx="10"/><text x="${x}" y="36" text-anchor="middle">${esc(name)}</text><text class="cap" x="${x}" y="56" text-anchor="middle">${esc(cap)}</text></g>`;
+  }
+  rows.forEach((r, idx) => {
+    const y = headH + 30 + idx * rowH;
+    const isCur = r.i === cur;
+    const v = r.v;
+    if (v.type === 'arrow') {
+      const x1 = LANE_X[v.from], x2 = LANE_X[v.to];
+      const dir = x2 > x1 ? 1 : -1;
+      const marker = v.cls === 'err' ? 'me' : (isCur ? 'mc' : 'm');
+      s += `<line class="arrow ${isCur ? 'cur' : ''} ${v.cls || ''}" x1="${x1}" y1="${y}" x2="${x2 - dir * 4}" y2="${y}" marker-end="url(#${marker})"/>`;
+      s += `<text class="lbl ${isCur ? 'cur' : ''} ${v.cls || ''}" x="${(x1 + x2) / 2}" y="${y - 8}" text-anchor="middle">${esc(v.label)}</text>`;
+    } else {
+      const x = LANE_X[v.lane];
+      s += `<g class="note ${isCur ? 'cur' : ''} ${v.cls || ''}"><rect x="${x - 135}" y="${y - 17}" width="270" height="34" rx="8"/><text x="${x}" y="${y + 4}" text-anchor="middle">${esc(v.label)}</text></g>`;
+    }
+  });
+  if (!rows.length) {
+    s += `<text class="lbl" x="450" y="${headH + 60}" text-anchor="middle">Nada aconteceu ainda. Clique em Play ou em "Próxima etapa".</text>`;
+  }
+  s += '</svg>';
+  $('#stage').innerHTML = s;
+}
+
+function renderStep() {
+  const s = path[cur];
+  let h = `<div class="stephead"><span class="stepno">Etapa ${cur}</span>${s.actor ? `<span class="actor a-${s.actor}">${ACTOR[s.actor]}</span>` : '<span>visão geral</span>'}${s.kind === 'decision' ? '<span class="badge-dec">◆ decisão</span>' : ''}</div>`;
+  h += `<h2>${esc(s.title)}</h2>`;
+  h += `<div class="explain">${s.explain}</div>`;
+  if (s.kind === 'decision') {
+    const d = s.decision;
+    const val = decisions[d.id];
+    h += `<div class="decision"><p class="dprompt">${esc(d.prompt)}</p><div class="dopts">`;
+    h += d.options.map((o) => `<button class="opt ${val === o.value ? 'sel' : ''}" data-dec="${esc(d.id)}" data-val="${esc(o.value)}">${esc(o.label)}${o.hint ? `<small>${esc(o.hint)}</small>` : ''}</button>`).join('');
+    h += '</div>';
+    h += val === undefined ? '<p class="dwait">A simulação está pausada: escolha uma opção para continuar.</p>' : '<p class="dok">Escolha registrada. Trocar a opção descarta as etapas seguintes do caminho anterior e as decisões posteriores.</p>';
+    h += '</div>';
+  }
+  $('#step').innerHTML = h;
+}
+
+function jsonHTML(v, hl, ind) {
+  ind = ind || 0;
+  const pad = '  '.repeat(ind);
+  if (Array.isArray(v)) {
+    if (!v.length) return '[]';
+    return '[\n' + v.map((x) => pad + '  ' + jsonHTML(x, hl, ind + 1)).join(',\n') + '\n' + pad + ']';
+  }
+  if (v && typeof v === 'object') {
+    const ks = Object.keys(v);
+    if (!ks.length) return '{}';
+    return '{\n' + ks.map((k) => {
+      const val = v[k];
+      const scalar = val === null || typeof val !== 'object';
+      const isHl = hl.includes(k) || (scalar && hl.includes(k + '=' + String(val)));
+      const keySpan = `<span class="k ${isHl && !scalar ? 'hl' : ''}">"${esc(k)}"</span>`;
+      const line = keySpan + ': ' + jsonHTML(val, hl, ind + 1);
+      return pad + '  ' + (isHl && scalar ? `<mark>${line}</mark>` : line);
+    }).join(',\n') + '\n' + pad + '}';
+  }
+  if (typeof v === 'string') return `<span class="s">"${esc(v)}"</span>`;
+  if (v === null) return '<span class="n">null</span>';
+  return `<span class="n">${esc(String(v))}</span>`;
+}
+
+function renderData() {
+  const s = path[cur];
+  if (!s.data) { $('#data').innerHTML = '<p class="empty">Nenhum payload nesta etapa.</p>'; return; }
+  const hl = s.data.hl || [];
+  const keys = hl.map((k) => k.split('=')[0]).filter((k, i, a) => a.indexOf(k) === i);
+  $('#data').innerHTML = `<div class="data-title">${esc(s.data.title)}</div><pre class="json">${jsonHTML(s.data.json, hl)}</pre>` + (keys.length ? `<p class="data-cap">Campos destacados: ${keys.map((k) => `<code>${esc(k)}</code>`).join(', ')}.</p>` : '');
+}
+
+function renderState() {
+  const s = path[cur];
+  const st = s.state;
+  const prevSt = cur > 0 ? path[cur - 1].state : null;
+  const rows = [
+    ['Rodada (chamadas à API feitas)', String(st.round), prevSt && prevSt.round !== st.round],
+    ['Último stop_reason lido', st.lastStop ? `<code>${esc(st.lastStop)}</code>` : '—', prevSt && prevSt.lastStop !== st.lastStop],
+    ['tool_use pendentes de execução', st.pending.length ? st.pending.map((id) => `<code>${esc(id)}</code>`).join(' ') : 'nenhum', prevSt && JSON.stringify(prevSt.pending) !== JSON.stringify(st.pending)],
+    ['Resultados prontos', Object.keys(st.results).length ? Object.entries(st.results).map(([id, r]) => `<code>${esc(id)}</code> ${r.is_error ? '<span class="iserr">erro</span>' : 'ok'}`).join('<br>') : 'nenhum', prevSt && JSON.stringify(prevSt.results) !== JSON.stringify(st.results)],
+    ['messages.length', String(st.messages.length), prevSt && prevSt.messages.length !== st.messages.length],
+    ['Próxima ação da aplicação', esc(st.next), prevSt && prevSt.next !== st.next],
+    ['O usuário vê', esc(st.userSees), prevSt && prevSt.userSees !== st.userSees],
+  ];
+  $('#state').innerHTML = '<table class="state">' + rows.map(([k, v, chg]) => `<tr><th>${k}</th><td class="${chg ? 'chg' : ''}">${v}</td></tr>`).join('') + '</table><p class="data-cap">Linhas sombreadas mudaram nesta etapa.</p>';
+}
+
+function renderTransitions() {
+  const s = path[cur];
+  $('#trans').innerHTML = s.transitions.length ? '<ul>' + s.transitions.map((t) => `<li>${esc(t)}</li>`).join('') + '</ul>' : '<p class="empty">—</p>';
+}
+
+const CHIP_COLORS = ['#2563EB', '#7C3AED', '#DB2777', '#059669', '#D97706'];
+function renderHistory() {
+  const st = path[cur].state;
+  const prevLen = cur > 0 ? path[cur - 1].state.messages.length : 0;
+  const colorOf = {};
+  let ci = 0;
+  const color = (id) => { if (!colorOf[id]) colorOf[id] = CHIP_COLORS[ci++ % CHIP_COLORS.length]; return colorOf[id]; };
+  if (!st.messages.length) { $('#hist').innerHTML = '<p class="empty">Histórico vazio: o array messages ainda não foi montado.</p>'; return; }
+  let h = `<div class="hist-meta"><code>messages.length = ${st.messages.length}</code> · a API não guarda nada: este array inteiro viaja em cada requisição. Chips da mesma cor ligam um <code>tool_use</code> ao seu <code>tool_result</code>.</div>`;
+  st.messages.forEach((m, idx) => {
+    const isNew = idx >= prevLen;
+    h += `<div class="msg ${m.role} ${isNew ? 'new' : ''}"><div class="role"><span>${m.role}</span><span class="idx">messages[${idx}]</span>${isNew ? '<span class="newtag">novo nesta etapa</span>' : ''}</div>`;
+    if (typeof m.content === 'string') {
+      h += `<div class="blk"><span class="bt">text ·</span> “${esc(m.content)}”</div>`;
+    } else {
+      for (const b of m.content) {
+        if (b.type === 'text') h += `<div class="blk"><span class="bt">text ·</span> “${esc(b.text)}”</div>`;
+        else if (b.type === 'tool_use') h += `<div class="blk"><span class="chip" style="--c:${color(b.id)}">${esc(b.id)}</span><span class="bt">tool_use ·</span> ${esc(b.name)}(${esc(JSON.stringify(b.input))})</div>`;
+        else if (b.type === 'tool_result') h += `<div class="blk ${b.is_error ? 'err' : ''}"><span class="chip" style="--c:${color(b.tool_use_id)}">${esc(b.tool_use_id)}</span><span class="bt">tool_result ·</span> ${b.is_error ? '<span class="iserr">is_error: true ·</span> ' : ''}${esc(b.content)}</div>`;
+      }
+    }
+    h += '</div>';
+  });
+  $('#hist').innerHTML = h;
+}
+
+function renderAll() {
+  renderControls(); renderTimeline(); renderChips(); renderStage(); renderStep(); renderData(); renderState(); renderTransitions(); renderHistory();
+}
+
+/* ------------------------------------------------------------ eventos */
+$('#btn-play').addEventListener('click', () => (playing ? pause() : play()));
+$('#btn-prev').addEventListener('click', () => { pause(); prev(); });
+$('#btn-next').addEventListener('click', () => { pause(); next(); });
+$('#btn-reset').addEventListener('click', reset);
+$('#speed').addEventListener('change', (e) => setSpeed(parseFloat(e.target.value)));
+document.addEventListener('click', (e) => {
+  const go = e.target.closest('[data-go]');
+  if (go) { pause(); goto(parseInt(go.dataset.go, 10)); return; }
+  const opt = e.target.closest('.opt[data-dec]');
+  if (opt) { pause(); const s = path[cur]; if (s.kind === 'decision' && s.decision.id === opt.dataset.dec) choose(s, opt.dataset.val); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.target && (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); pause(); next(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); pause(); prev(); }
+  else if (e.key === ' ') { e.preventDefault(); playing ? pause() : play(); }
+});
+
+window.__sim = {
+  get cur() { return cur; },
+  get playing() { return playing; },
+  path: () => path,
+  decisions: () => clone(decisions),
+  goto, choose: (id, v) => { const s = path.find((x) => x.kind === 'decision' && x.decision.id === id); if (s) choose(s, v); },
+  play, pause, next, prev, reset, setSpeed,
+};
+
+renderAll();
+})();
+</script>
+</body>
+</html>

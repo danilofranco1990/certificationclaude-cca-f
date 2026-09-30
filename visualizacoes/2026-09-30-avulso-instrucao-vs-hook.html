@@ -1,0 +1,1512 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pedido ou portão</title>
+<meta name="description" content="Simulador de hooks do Claude Code: a regra 'nunca edite infra/prod/' como instrução e como hook, numa sessão longa, com o arquivo em disco como prova.">
+<style>
+  :root {
+    --ground:  #F3F6F6;
+    --surface: #FFFFFF;
+    --ink:     #13191C;
+    --muted:   #58646B;
+    --faint:   #A1ACB2;
+    --rule:    #D9E0E2;
+    --accent:  #0F5C57;
+    --code-bg: #EDF1F2;
+    --err:     #B42318;
+    --err-bg:  #FDECEA;
+    --good:    #15803D;
+    --good-bg: #E5F4E9;
+    --warn:    #A15C07;
+    --warn-bg: #FEF3C7;
+    --user:    #A21C5B;
+    --model:   #5B3FBF;
+    --model-bg:#EFEBFB;
+    --harness: #0F5C57;
+    --harness-bg:#E1F0EE;
+    --tools:   #92400E;
+    --tools-bg:#FBF0E3;
+    --mat:     #1D4ED8;
+    --doc:     #047857;
+    --sim:     #C2410C;
+    --on-fill: #FFFFFF;
+    --hl:      rgba(15, 92, 87, .15);
+    --hl-line: rgba(15, 92, 87, .07);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #0E1315;
+      --surface: #151B1E;
+      --ink:     #E3E9EB;
+      --muted:   #94A1A7;
+      --faint:   #4A555B;
+      --rule:    #273034;
+      --accent:  #4FB3A6;
+      --code-bg: #1B2327;
+      --err:     #F87171;
+      --err-bg:  #3A1D1F;
+      --good:    #4ADE80;
+      --good-bg: #14301D;
+      --warn:    #FBBF24;
+      --warn-bg: #3A2E12;
+      --user:    #F472B6;
+      --model:   #A78BFA;
+      --model-bg:#231D39;
+      --harness: #4FB3A6;
+      --harness-bg:#13302C;
+      --tools:   #F0A34D;
+      --tools-bg:#33240F;
+      --mat:     #7FA6FF;
+      --doc:     #4ADE80;
+      --sim:     #FB923C;
+      --on-fill: #0E1315;
+      --hl:      rgba(79, 179, 166, .25);
+      --hl-line: rgba(79, 179, 166, .10);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:  #0E1315;
+    --surface: #151B1E;
+    --ink:     #E3E9EB;
+    --muted:   #94A1A7;
+    --faint:   #4A555B;
+    --rule:    #273034;
+    --accent:  #4FB3A6;
+    --code-bg: #1B2327;
+    --err:     #F87171;
+    --err-bg:  #3A1D1F;
+    --good:    #4ADE80;
+    --good-bg: #14301D;
+    --warn:    #FBBF24;
+    --warn-bg: #3A2E12;
+    --user:    #F472B6;
+    --model:   #A78BFA;
+    --model-bg:#231D39;
+    --harness: #4FB3A6;
+    --harness-bg:#13302C;
+    --tools:   #F0A34D;
+    --tools-bg:#33240F;
+    --mat:     #7FA6FF;
+    --doc:     #4ADE80;
+    --sim:     #FB923C;
+    --on-fill: #0E1315;
+    --hl:      rgba(79, 179, 166, .25);
+    --hl-line: rgba(79, 179, 166, .10);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; padding-inline: 16px; padding-block: 16px 40px;
+    background: var(--ground); color: var(--ink);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+  code, pre, .mono { font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Courier New", monospace; }
+  code { font-size: .86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .panel, .warnbox, .sub, td, th, li, p, .opt { overflow-wrap: anywhere; min-width: 0; }
+  h1 { font-size: 1.9rem; line-height: 1.15; margin: 0 0 8px; letter-spacing: -.01em; text-wrap: balance; }
+  h2 { font-size: 1rem; margin: 0 0 10px; text-wrap: balance; }
+  h2 small { font-weight: 500; color: var(--muted); font-size: .8rem; margin-left: 6px; }
+  h3 { font-size: .93rem; margin: 16px 0 6px; }
+  p { margin: 0 0 10px; }
+  ul, ol { margin: 0 0 10px; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wrap { max-width: 1320px; margin: 0 auto; }
+  .eyebrow { font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin: 0 0 6px; }
+  .sub { color: var(--muted); margin-bottom: 10px; max-width: 70ch; }
+  .why { font-size: .88rem; color: var(--muted); margin: 0 0 10px; padding: 6px 10px; border-left: 3px solid var(--accent); background: var(--hl-line); border-radius: 4px; max-width: 110ch; }
+  .warnbox { border: 1px dashed var(--sim); border-radius: 8px; padding: 8px 12px; font-size: .9rem; margin: 8px 0 12px; background: var(--surface); max-width: 110ch; }
+
+  .tag { display: inline-block; font-size: .67rem; line-height: 1.45; padding: 0 7px; border-radius: 999px; border: 1px solid; margin-left: 4px; vertical-align: middle; white-space: nowrap; font-family: system-ui, sans-serif; font-weight: 600; text-decoration: none; }
+  .t-mat { color: var(--mat); border-color: var(--mat); }
+  .t-doc { color: var(--doc); border-color: var(--doc); }
+  a.t-doc:hover { background: var(--hl-line); }
+  .t-sim { color: var(--sim); border-color: var(--sim); border-style: dashed; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: .85rem; color: var(--muted); align-items: center; margin-bottom: 10px; }
+  .legend .tag { margin-left: 0; }
+
+  .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; }
+
+  /* controles */
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 8px; }
+  .btn { font: inherit; font-size: .9rem; padding: 7px 13px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .btn:hover:not(:disabled) { border-color: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.primary { background: var(--accent); color: var(--on-fill); border-color: var(--accent); font-weight: 600; min-width: 104px; }
+  select { font: inherit; font-size: .9rem; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); max-width: 100%; }
+  .progress { font-size: .88rem; color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+  .kbd { font-size: .78rem; color: var(--muted); margin: 0 0 12px; }
+  .timeline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
+  .tl { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--rule); background: var(--surface); cursor: pointer; padding: 0; }
+  .tl.past { background: var(--rule); }
+  .tl.cur { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 3px var(--hl); }
+  .tl.dec { border-radius: 3px; transform: rotate(45deg); width: 15px; height: 15px; margin: 0 2px; border-color: var(--model); }
+  .tl.dec.cur { background: var(--model); border-color: var(--model); }
+  .tl.dec.pending { background: var(--model-bg); }
+  .tl.end { border-color: var(--ink); }
+
+  /* grade principal */
+  .grid { display: grid; grid-template-columns: minmax(250px, 320px) minmax(0, 1fr); gap: 14px; align-items: start; }
+  .col { display: grid; gap: 14px; min-width: 0; }
+  .rail-panel { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 10px); }
+  .duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 980px) {
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .rail-panel { position: static; }
+  }
+  @media (max-width: 720px) { .duo { grid-template-columns: minmax(0, 1fr); } }
+
+  /* trilho do ciclo de vida */
+  .rail { list-style: none; margin: 0; padding: 0; position: relative; }
+  .rail::before { content: ""; position: absolute; left: 8px; top: 8px; bottom: 8px; width: 2px; background: var(--rule); }
+  .st { position: relative; padding: 5px 6px 7px 28px; margin: 0; }
+  .st::before { content: ""; position: absolute; left: 3px; top: 10px; width: 12px; height: 12px; border-radius: 50%; background: var(--surface); border: 2px solid var(--faint); }
+  .st .nm { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .8rem; font-weight: 600; }
+  .st .ds { display: block; font-size: .78rem; color: var(--muted); line-height: 1.35; }
+  .st .ct { float: right; font-size: .74rem; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 6px; font-family: ui-monospace, Consolas, monospace; }
+  .st .ct.bump { color: var(--accent); font-weight: 700; }
+  .st.cur { background: var(--hl); border-radius: 8px; }
+  .st.cur::before { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px var(--hl); }
+  .st.dim .nm, .st.dim .ds { opacity: .55; }
+  .st.phase::before { border-color: var(--model); border-style: dashed; }
+  .st.phase .nm { color: var(--model); font-family: system-ui, sans-serif; }
+  .st.phase.cur::before { background: var(--model); border-color: var(--model); }
+  .st.gate .nm { color: var(--harness); }
+  .plug { display: inline-block; margin-top: 4px; font-size: .72rem; font-weight: 600; color: var(--harness); background: var(--harness-bg); border: 1px solid var(--harness); border-radius: 6px; padding: 1px 6px; font-family: ui-monospace, Consolas, monospace; }
+  .can-block { display: inline-block; font-size: .66rem; font-weight: 700; color: var(--harness); letter-spacing: .04em; text-transform: uppercase; margin-left: 6px; }
+  .st.exec { padding: 0; margin: 4px 0 6px; }
+  .st.exec::before { display: none; }
+  .execline { border-top: 2px dashed var(--faint); padding: 6px 8px 4px 28px; font-size: .78rem; color: var(--muted); position: relative; background: var(--surface); }
+  .execline b { color: var(--ink); }
+  .execline .res { display: block; margin-top: 3px; font-weight: 600; }
+  .execline.ok-prod { border-top-color: var(--err); }
+  .execline.ok-prod .res { color: var(--err); }
+  .execline.ok-other .res { color: var(--tools); }
+  .execline.bloq { border-top-color: var(--harness); }
+  .execline.bloq .res { color: var(--harness); }
+  .st.exec.cur .execline { background: var(--hl); border-radius: 0 0 8px 8px; }
+  .rail-note { font-size: .78rem; color: var(--muted); margin: 10px 0 0; }
+
+  /* etapa */
+  .step-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .actor { display: inline-block; font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 2px 8px; border-radius: 6px; border: 1px solid; }
+  .a-none { color: var(--muted); border-color: var(--rule); }
+  .a-user { color: var(--user); border-color: var(--user); }
+  .a-model { color: var(--model); border-color: var(--model); background: var(--model-bg); }
+  .a-harness { color: var(--harness); border-color: var(--harness); background: var(--harness-bg); }
+  .a-tools { color: var(--tools); border-color: var(--tools); background: var(--tools-bg); }
+  .step-idx { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .step h2 { font-size: 1.2rem; margin: 0 0 8px; }
+  .step .txt p:last-child { margin-bottom: 0; }
+  .opts { display: grid; gap: 8px; margin-top: 12px; }
+  .opt { text-align: left; font: inherit; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 9px; padding: 9px 12px; cursor: pointer; }
+  .opt:hover { border-color: var(--model); }
+  .opt b { display: block; font-size: .93rem; }
+  .opt span { display: block; font-size: .84rem; color: var(--muted); }
+  .opt.chosen { border-color: var(--model); background: var(--model-bg); box-shadow: inset 3px 0 0 var(--model); }
+  .decnote { font-size: .84rem; color: var(--muted); margin: 10px 0 0; }
+  .hint { font-size: .86rem; margin-top: 10px; padding: 7px 10px; border-radius: 8px; background: var(--model-bg); color: var(--ink); }
+
+  .cfg { display: grid; gap: 10px; margin-top: 12px; }
+  .cfg-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .cfg-row label { display: grid; gap: 4px; font-size: .8rem; color: var(--muted); font-weight: 600; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .presets .btn { font-size: .8rem; padding: 5px 9px; text-align: left; }
+  .presets .btn small { display: block; color: var(--muted); font-size: .72rem; }
+  .presets .btn.on { border-color: var(--accent); background: var(--hl-line); box-shadow: inset 0 0 0 1px var(--accent); }
+  .cfg-prev { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 10px; }
+  .lbl { font-size: .72rem; color: var(--muted); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 3px; }
+  .cfg-prev > div, .cfg-row > label { min-width: 0; }
+  @media (max-width: 720px) { .cfg-row, .cfg-prev { grid-template-columns: minmax(0, 1fr); } }
+
+  pre { margin: 0; }
+  .code { background: var(--code-bg); border-radius: 8px; padding: 9px 11px; font-size: .76rem; line-height: 1.5; overflow-x: auto; white-space: pre; }
+  .code .ln { display: block; }
+  .code .ln.hl { background: var(--hl); margin: 0 -11px; padding: 0 11px; box-shadow: inset 3px 0 0 var(--accent); }
+
+  /* raias */
+  .trio { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 720px) { .trio { grid-template-columns: minmax(0, 1fr); } }
+  .lane-model { border-top: 3px solid var(--model); }
+  .lane-harness { border-top: 3px solid var(--harness); }
+  .kv { display: grid; grid-template-columns: minmax(96px, 38%) minmax(0, 1fr); gap: 7px 10px; font-size: .86rem; align-items: baseline; margin: 0; }
+  .kv dt { color: var(--muted); font-size: .8rem; }
+  .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .meter { height: 8px; border-radius: 99px; background: var(--code-bg); overflow: hidden; margin-top: 4px; }
+  .meter i { display: block; height: 100%; background: var(--model); border-radius: 99px; transition: width .35s ease; }
+  .meter.hot i { background: var(--warn); }
+  .chip { display: inline-block; font-size: .78rem; font-weight: 600; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--rule); color: var(--muted); }
+  .chip.good { color: var(--good); border-color: var(--good); background: var(--good-bg); }
+  .chip.bad { color: var(--err); border-color: var(--err); background: var(--err-bg); }
+  .chip.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-bg); }
+  .chip.hz { color: var(--harness); border-color: var(--harness); background: var(--harness-bg); }
+  .exitbox { display: inline-flex; align-items: center; justify-content: center; min-width: 2.2em; min-height: 2.2em; padding: 2px .45em; border-radius: 8px; border: 2px solid var(--rule); font: 700 1rem/1.1 ui-monospace, Consolas, monospace; }
+  .exitbox.e2 { border-color: var(--harness); color: var(--harness); background: var(--harness-bg); }
+  .exitbox.e1 { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
+  .exitbox.e0 { color: var(--muted); }
+  details { margin-top: 10px; font-size: .85rem; }
+  summary { cursor: pointer; color: var(--accent); margin-bottom: 6px; }
+
+  /* mundo */
+  .files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 720px) { .files { grid-template-columns: minmax(0, 1fr); } }
+  .file { border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+  .file .fh { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 6px 10px; background: var(--code-bg); font-size: .8rem; flex-wrap: wrap; }
+  .file .fh code { background: none; padding: 0; font-weight: 600; }
+  .file pre { padding: 8px 10px; font-size: .78rem; line-height: 1.5; overflow-x: auto; }
+  .file .imgline { display: block; margin: 0 -10px; padding: 0 10px; }
+  .file .imgline.diff { background: var(--tools-bg); color: var(--tools); font-weight: 700; }
+  .file.prod-bad { border-color: var(--err); box-shadow: 0 0 0 1px var(--err); }
+  .file.prod-bad .imgline.diff { background: var(--err-bg); color: var(--err); }
+  .file.now { animation: pulse 1.1s ease 1; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 5px var(--hl); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  @media (prefers-reduced-motion: reduce) { .file.now { animation: none; } .meter i { transition: none; } }
+  .logs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+  @media (max-width: 720px) { .logs { grid-template-columns: minmax(0, 1fr); } }
+  .logbox pre { background: var(--code-bg); border-radius: 8px; padding: 7px 9px; font-size: .74rem; min-height: 2.4em; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .logbox pre span { display: block; }
+  .logbox .empty { color: var(--muted); }
+  .logbox .new { background: var(--hl); }
+
+  /* dados, estado */
+  .json { background: var(--code-bg); border-radius: 8px; padding: 10px 12px; font-size: .77rem; line-height: 1.5; overflow-x: auto; white-space: pre; max-height: 440px; overflow-y: auto; }
+  .json .ln.hl { background: var(--hl); display: inline-block; min-width: 100%; box-shadow: inset 3px 0 0 var(--accent); }
+  .datanote { font-size: .8rem; color: var(--muted); margin: 6px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .84rem; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  #state th { color: var(--muted); font-weight: 500; width: 44%; }
+  #state td.chg { background: var(--hl); font-weight: 600; }
+  #trans li { font-size: .88rem; }
+
+  /* matriz */
+  .wide { margin-top: 14px; }
+  .scroll { overflow-x: auto; }
+  #matrix { min-width: 760px; }
+  #matrix th { font-size: .8rem; color: var(--muted); font-weight: 600; }
+  #matrix td.rowh { font-size: .83rem; font-weight: 600; min-width: 190px; }
+  #matrix td.rowh small { display: block; font-weight: 400; color: var(--muted); }
+  .cell { display: block; width: 100%; text-align: left; font: inherit; font-size: .78rem; border-radius: 7px; padding: 6px 8px; border: 1px solid var(--rule); cursor: pointer; background: var(--surface); color: var(--ink); }
+  .cell:hover { border-color: var(--accent); }
+  .cell.c-ok { background: var(--good-bg); border-color: var(--good); }
+  .cell.c-mod { background: var(--model-bg); border-color: var(--model); }
+  .cell.c-bad { background: var(--err-bg); border-color: var(--err); }
+  .cell b { display: block; font-size: .8rem; }
+  .cell.c-ok b { color: var(--good); }
+  .cell.c-mod b { color: var(--model); }
+  .cell.c-bad b { color: var(--err); }
+  .cell.cur { box-shadow: 0 0 0 3px var(--accent); }
+  .matrix-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .8rem; color: var(--muted); margin: 8px 0 0; }
+  .sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; border: 1px solid; vertical-align: -1px; margin-right: 4px; }
+  .sw.ok { background: var(--good-bg); border-color: var(--good); }
+  .sw.mod { background: var(--model-bg); border-color: var(--model); }
+  .sw.bad { background: var(--err-bg); border-color: var(--err); }
+
+  /* quase */
+  .q-ctrl { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px 18px; align-items: end; margin: 8px 0 12px; }
+  .q-ctrl label { display: grid; gap: 4px; font-size: .84rem; color: var(--muted); }
+  .q-ctrl label b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  @media (max-width: 720px) { .q-ctrl { grid-template-columns: minmax(0, 1fr); } }
+  .q-out { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-bottom: 12px; }
+  .q-out div { font-size: .86rem; color: var(--muted); max-width: 34ch; }
+  .q-out .big { display: block; font: 700 1.7rem/1.1 system-ui, sans-serif; color: var(--err); font-variant-numeric: tabular-nums; }
+  .q-out .big.ok { color: var(--good); }
+  .q-row { display: grid; grid-template-columns: 170px minmax(0, 1fr) 150px; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--rule); }
+  @media (max-width: 720px) { .q-row { grid-template-columns: minmax(0, 1fr); } }
+  .q-lab { font-size: .84rem; font-weight: 600; }
+  .q-count { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dots { display: flex; flex-wrap: wrap; gap: 3px; }
+  .dot { width: 9px; height: 9px; border-radius: 2px; background: var(--rule); }
+  .dot.v { background: var(--err); }
+  .dot.b { background: var(--surface); box-shadow: inset 0 0 0 2px var(--good); }
+
+  /* referência */
+  .ref h2 { font-size: 1.05rem; }
+  .ref table td:first-child { font-weight: 600; white-space: nowrap; }
+  @media (max-width: 720px) { .ref table td:first-child { white-space: normal; } }
+  .ref .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 860px) { .ref .cols { grid-template-columns: minmax(0, 1fr); } }
+  .note { font-size: .82rem; color: var(--muted); }
+  footer { font-size: .8rem; color: var(--muted); margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">D1 §6 · Hooks · simulador</p>
+  <h1>Pedido ou portão</h1>
+  <p class="sub">A regra “nunca edite arquivos em <code>infra/prod/</code>” escrita como instrução e como hook, na mesma sessão longa. Você configura a proteção, faz o papel do modelo no turno 41 e observa o arquivo em disco.</p>
+  <div class="warnbox"><b>Esta simulação não faz chamadas reais.</b> Nenhum modelo, hook ou arquivo é executado. Tudo é calculado no navegador a partir das suas escolhas.</div>
+  <div class="legend">
+    <span><span class="tag t-mat">material</span> está no texto colado ou na §6 do D1</span>
+    <span><span class="tag t-doc">doc oficial</span> conferido em 2026-09-30; o selo é um link</span>
+    <span><span class="tag t-sim">simulação</span> hipótese do exemplo, não é comportamento garantido</span>
+  </div>
+  <p class="why"><b>Por que um trilho de estados:</b> a pergunta do tópico é <i>em que ponto</i> do ciclo de vida o seu código roda e <i>quem</i> decide ali. O trilho mostra os pontos fixos, os painéis separam o modelo que pede do harness que decide, e o arquivo em disco mostra a consequência.</p>
+</header>
+
+<section class="controls" aria-label="Controles da simulação">
+  <button class="btn primary" id="b-play" type="button">▶ Play</button>
+  <button class="btn" id="b-prev" type="button">◀ Anterior</button>
+  <button class="btn" id="b-next" type="button">Próxima ▶</button>
+  <button class="btn" id="b-reset" type="button">Reiniciar</button>
+  <label for="speed" class="note">Velocidade</label>
+  <select id="speed">
+    <option value="0.5">0,5×</option>
+    <option value="1" selected>1×</option>
+    <option value="2">2×</option>
+    <option value="4">4×</option>
+  </select>
+  <span class="progress" id="progress"></span>
+</section>
+<div class="timeline" id="timeline" aria-label="Linha do tempo"></div>
+<p class="kbd">Atalhos: ← e → movem uma etapa, espaço liga e desliga o Play. Os losangos ◆ são decisões: o Play para neles. O total de etapas cresce quando você decide.</p>
+
+<main class="grid">
+  <aside class="panel rail-panel" aria-label="Ciclo de vida da sessão">
+    <h2>Ciclo de vida da sessão</h2>
+    <ol class="rail" id="rail"></ol>
+    <p class="rail-note">Os contadores mostram quantas vezes cada evento disparou nesta sessão. O selo verde marca onde o hook da equipe está pendurado.</p>
+  </aside>
+
+  <div class="col">
+    <section class="panel step" id="step" aria-live="polite"></section>
+
+    <div class="trio">
+      <section class="panel lane-model">
+        <h2>Modelo <small>probabilístico: pede</small></h2>
+        <div id="p-model"></div>
+      </section>
+      <section class="panel lane-harness">
+        <h2>Harness <small>determinístico: decide</small></h2>
+        <div id="p-harness"></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Mundo <small>o que está em disco</small></h2>
+      <div id="p-world"></div>
+    </section>
+
+    <section class="panel">
+      <h2 id="data-title">Dados</h2>
+      <pre class="json" id="data"></pre>
+      <p class="datanote" id="data-note"></p>
+    </section>
+
+    <div class="duo">
+      <section class="panel">
+        <h2>Estado</h2>
+        <table id="state"></table>
+      </section>
+      <section class="panel">
+        <h2>Transições possíveis</h2>
+        <ul id="trans"></ul>
+      </section>
+    </div>
+  </div>
+</main>
+
+<section class="panel wide" aria-labelledby="mx-title">
+  <h2 id="mx-title">Matriz: proteção × pedido do modelo</h2>
+  <p class="note">Cada célula roda a mesma sessão: regra no <code>CLAUDE.md</code> da raiz, modo <code>bypassPermissions</code>, modelo que desiste depois de um bloqueio <span class="tag t-sim">simulação</span>. Leia por linha. Na linha “Só a regra escrita”, o desfecho muda com a coluna: depende do que o modelo pediu. Na linha do exit 2, <code>Edit</code> e <code>Write</code> dão o mesmo desfecho, porque quem decide é o harness. A coluna <code>Bash</code> mostra o limite: o matcher filtra pelo nome da ferramenta <a class="tag t-doc" href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener" title="https://code.claude.com/docs/en/hooks · consultado em 2026-09-30">doc oficial</a>. Clique numa célula para percorrer aquele caminho.</p>
+  <div class="scroll"><table id="matrix"></table></div>
+  <div class="matrix-legend">
+    <span><span class="sw ok"></span>intacto, barrado pelo hook</span>
+    <span><span class="sw mod"></span>intacto, porque o modelo não pediu</span>
+    <span><span class="sw bad"></span>produção alterada</span>
+  </div>
+</section>
+
+<section class="panel wide" aria-labelledby="q-title">
+  <h2 id="q-title">Quanto vale “quase sempre”</h2>
+  <p class="note" style="max-width:90ch">O material diz que o modelo atende a instrução quase sempre, e que <i>quase</i> é o que uma política de segurança não aceita <span class="tag t-mat">material</span>. Ajuste a taxa e o número de oportunidades. A taxa é hipotética: a doc não publica taxa de obediência, e a conta supõe tentativas independentes, todas com <code>Edit</code> ou <code>Write</code> <span class="tag t-sim">simulação</span>.</p>
+  <div class="q-ctrl">
+    <label for="q-p">Taxa de atendimento por oportunidade <b id="q-p-v"></b><input type="range" id="q-p" min="900" max="999" step="1" value="990"></label>
+    <label for="q-n">Pedidos que tocariam produção em duas semanas <b id="q-n-v"></b><input type="range" id="q-n" min="1" max="400" step="1" value="120"></label>
+    <button class="btn" id="q-sort" type="button">Sortear outra quinzena</button>
+  </div>
+  <div class="q-out">
+    <div><span class="big" id="q-prob"></span>chance de ao menos uma edição em produção, só com a instrução</div>
+    <div><span class="big" id="q-exp"></span>edições esperadas por quinzena, só com a instrução</div>
+    <div><span class="big ok">0</span>edições com o hook em <code>PreToolUse</code>, qualquer que seja a taxa</div>
+  </div>
+  <div class="q-row"><div class="q-lab">Só a instrução</div><div class="dots" id="q-dots-a" aria-hidden="true"></div><div class="q-count" id="q-count-a"></div></div>
+  <div class="q-row"><div class="q-lab">Com <code>PreToolUse</code> · <code>Edit|Write</code> · exit 2</div><div class="dots" id="q-dots-b" aria-hidden="true"></div><div class="q-count" id="q-count-b"></div></div>
+  <p class="note">Cada quadrado é um pedido. Vermelho: o modelo pediu a edição e ela aconteceu. Contorno verde: o mesmo pedido, barrado antes da execução. O hook não muda o que o modelo pede; muda o que acontece com o pedido.</p>
+</section>
+
+<section class="panel wide ref" aria-labelledby="ref-title">
+  <h2 id="ref-title">Referência técnica</h2>
+  <div class="scroll">
+  <table>
+    <tr><th>Fato</th><th>O que a fonte diz</th><th>Fonte</th></tr>
+    <tr><td>Hook</td><td>Handler configurado em <code>settings.json</code> que o Claude Code executa automaticamente num ponto fixo do ciclo de vida. Instrução em prompt é probabilística; hook é determinístico.</td><td><span class="tag t-mat">material</span></td></tr>
+    <tr><td>CLAUDE.md é contexto</td><td>“Claude treats them as context, not enforced configuration. To block an action regardless of what Claude decides, use a PreToolUse hook instead.”</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/memory" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    <tr><td>Compaction</td><td>“Project-root CLAUDE.md survives compaction.” Some o que foi dito só na conversa, um CLAUDE.md aninhado que ainda não recarregou ou uma regra com <code>paths:</code> que ainda não casou com arquivo.</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/context-window#what-survives-compaction" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    <tr><td>Exit 0</td><td>“Exit code 0 with no output means the hook has no decision to report… The hook can deny the call, but staying silent doesn't approve it.”</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    <tr><td>Exit 2 em PreToolUse</td><td>“Blocks the tool call.” Um JSON com <code>allow</code> não desfaz o exit 2. “Claude sees the stderr message as the denial reason.”</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/hooks#exit-code-2-behavior-per-event" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    <tr><td>Outros códigos</td><td>Não bloqueiam. O transcript mostra o aviso com “Failed with non-blocking status code:”. Um caminho de script errado cai no mesmo aviso: “a mistyped path in settings.json leaves the gate silently disabled.”</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    <tr><td>permissionDecision</td><td><code>allow</code>, <code>deny</code>, <code>ask</code>, <code>defer</code>. Entre hooks, vence <code>deny</code> &gt; <code>defer</code> &gt; <code>ask</code> &gt; <code>allow</code>. Um <code>allow</code> não passa por cima das regras de deny do settings.</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/hooks#pretooluse-decision-control" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    <tr><td>Modos de permissão</td><td>“A hook that returns permissionDecision: "deny" blocks the tool even in bypassPermissions mode or with --dangerously-skip-permissions.”</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/hooks-guide#hooks-and-permission-modes" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    <tr><td>PostToolUse</td><td>Exit 2: “Shows stderr to Claude; the tool already ran.” “PostToolUse hooks can't undo actions since the tool has already executed.”</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/hooks-guide#limitations" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    <tr><td>PostToolUseFailure</td><td>“Runs when a tool that started executing fails.” Uma chamada barrada antes da execução não o dispara.</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/hooks#posttoolusefailure" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    <tr><td>Matcher</td><td>Só letras, dígitos, <code>_</code>, <code>-</code>, espaço, vírgula e <code>|</code>: lista de nomes exatos. Qualquer outro caractere: regex JavaScript sem âncora. “Matchers are case-sensitive.”</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    <tr><td>Onde configurar</td><td><code>.claude/settings.json</code> é do projeto e pode ser commitado: é o lugar de uma regra da equipe. <code>~/.claude/settings.json</code> fica só na sua máquina.</td><td><span class="tag t-mat">material</span> <a class="tag t-doc" href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    <tr><td>Desfazer depois</td><td>Edições de arquivo têm checkpoint: Esc duas vezes volta atrás. Ações em sistemas remotos não têm. Isso é alguém revertendo depois, não o hook impedindo.</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/how-claude-code-works#undo-changes-with-checkpoints" target="_blank" rel="noopener">doc oficial</a></td></tr>
+  </table>
+  </div>
+
+  <div class="cols">
+    <div>
+      <h3>Erros de interpretação frequentes</h3>
+      <ul>
+        <li><b>“Regra em negrito, no topo, resolve.”</b> Continua instrução e continua probabilística <span class="tag t-mat">material</span>.</li>
+        <li><b>“Um PostToolUse que registra tudo é um gate.”</b> Ele detecta com o dano feito. Para impedir, só <code>PreToolUse</code> <span class="tag t-mat">material</span>.</li>
+        <li><b>“Exit 1 bloqueia, é o código de erro.”</b> Só o 2 bloqueia. Exit 1 é erro não bloqueante <span class="tag t-mat">material</span>.</li>
+        <li><b>“Matcher Edit cobre qualquer escrita.”</b> <code>Write</code> fica de fora <span class="tag t-mat">material</span>, e <code>Bash</code> também <span class="tag t-doc">doc oficial</span>.</li>
+        <li><b>“Exit 0 aprova a chamada.”</b> Não aprova: ela segue o fluxo normal de permissão <span class="tag t-doc">doc oficial</span>.</li>
+        <li><b>“A compaction apaga o CLAUDE.md.”</b> O da raiz é reinjetado do disco. Some o que foi dito só na conversa <span class="tag t-doc">doc oficial</span>. A regra do CLAUDE.md da raiz ainda pode perder para outra instrução <span class="tag t-mat">material</span>.</li>
+        <li><b>“Determinístico quer dizer cobertura total.”</b> O hook é determinístico dentro do matcher e do que o script inspeciona. Um script que lê <code>file_path</code> não vê um caminho escrito dentro de um comando.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Pedido e portão: o mapeamento</h3>
+      <table>
+        <tr><th>No título</th><th>No Claude Code</th></tr>
+        <tr><td>Pedido</td><td>A regra no <code>CLAUDE.md</code>: o modelo pode atender ou não.</td></tr>
+        <tr><td>Portão</td><td>O handler em <code>PreToolUse</code>: roda em toda chamada que o matcher seleciona.</td></tr>
+        <tr><td>Tranca</td><td>Exit 2 ou <code>permissionDecision: "deny"</code>.</td></tr>
+        <tr><td>Câmera</td><td><code>PostToolUse</code>: vê e registra depois que a ação passou.</td></tr>
+        <tr><td>Porta lateral</td><td>Uma ferramenta fora do matcher, como <code>Bash</code>.</td></tr>
+      </table>
+      <p class="note" style="margin-top:8px"><b>Onde a analogia deixa de valer.</b> Um portão barra quem passa por ele; o hook só avalia o que o script sabe ler. O hook pode reescrever o pedido antes de executar, com <code>updatedInput</code>, ou pedir confirmação, com <code>ask</code>, e portão não faz isso. E quem é barrado recebe o motivo por escrito e pode tentar outro caminho.</p>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div>
+      <h3>O que ficou fora deste recorte</h3>
+      <ul>
+        <li>Quando <i>não</i> usar hook: regra que exige julgamento, como “prefira nomes descritivos” (resto da §6).</li>
+        <li>Handlers <code>http</code>, <code>mcp_tool</code>, <code>prompt</code> e <code>agent</code>. Só <code>command</code> aparece.</li>
+        <li><code>updatedInput</code>, <code>additionalContext</code>, <code>ask</code> e <code>defer</code>: citados, não simulados.</li>
+        <li>Eventos fora do diagrama do material, como <code>PermissionRequest</code> e <code>PostToolBatch</code>.</li>
+        <li>Stdout de <code>SessionStart</code> e <code>UserPromptSubmit</code> virando contexto. <code>Stop</code> e <code>SubagentStop</code> bloqueando para o modelo continuar.</li>
+        <li>O prompt de permissão dos modos interativos: a sessão foi fixada em <code>bypassPermissions</code>.</li>
+        <li>Hooks em frontmatter de skill e de subagent, managed settings, timeouts e hooks assíncronos.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Fontes, consultadas em 2026-09-30</h3>
+      <ul>
+        <li>Material: texto colado e <code>dominios/01-agentic-architecture/notas.md</code> §6, <code>armadilhas.md</code> e a questão 6 de <code>questions.md</code>.</li>
+        <li><a href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">Hooks reference</a></li>
+        <li><a href="https://code.claude.com/docs/en/hooks-guide" target="_blank" rel="noopener">Hooks guide</a></li>
+        <li><a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">Permissions</a></li>
+        <li><a href="https://code.claude.com/docs/en/memory" target="_blank" rel="noopener">Memory (CLAUDE.md)</a></li>
+        <li><a href="https://code.claude.com/docs/en/context-window" target="_blank" rel="noopener">Context window</a></li>
+        <li><a href="https://code.claude.com/docs/en/how-claude-code-works" target="_blank" rel="noopener">How Claude Code works</a></li>
+        <li><a href="https://code.claude.com/docs/en/tools-reference" target="_blank" rel="noopener">Tools reference</a></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>Gerado pela skill <code>/visualizar-conceito</code>. Arquivo autônomo: sem dependências externas, funciona em <code>file://</code>.</footer>
+</div>
+
+<script>
+'use strict';
+/* ================= utilitários ================= */
+const clone = (x) => JSON.parse(JSON.stringify(x));
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+/* [[texto]] vira <code>texto</code> */
+const fmt = (s) => String(s).replace(/\[\[(.+?)\]\]/g, (m, x) => '<code>' + esc(x) + '</code>');
+
+const DOC = {
+  hooks: 'https://code.claude.com/docs/en/hooks',
+  hooksExit: 'https://code.claude.com/docs/en/hooks#exit-code-2-behavior-per-event',
+  hooksPre: 'https://code.claude.com/docs/en/hooks#pretooluse-decision-control',
+  hooksFail: 'https://code.claude.com/docs/en/hooks#posttoolusefailure',
+  guideModes: 'https://code.claude.com/docs/en/hooks-guide#hooks-and-permission-modes',
+  guideLimits: 'https://code.claude.com/docs/en/hooks-guide#limitations',
+  permsRE: 'https://code.claude.com/docs/en/permissions#read-and-edit',
+  mem: 'https://code.claude.com/docs/en/memory',
+  cw: 'https://code.claude.com/docs/en/context-window#what-survives-compaction',
+  how: 'https://code.claude.com/docs/en/how-claude-code-works#when-context-fills-up',
+  tools: 'https://code.claude.com/docs/en/tools-reference',
+};
+const M = '<span class="tag t-mat" title="Está no texto colado ou na §6 do D1">material</span>';
+const S = '<span class="tag t-sim" title="Hipótese criada para o exemplo; não é comportamento garantido">simulação</span>';
+const D = (k) => `<a class="tag t-doc" href="${DOC[k]}" target="_blank" rel="noopener" title="${DOC[k]} · consultado em 2026-09-30">doc oficial</a>`;
+
+/* ================= domínio ================= */
+const STG = '/repo/infra/staging/deploy.yaml';
+const PRD = '/repo/infra/prod/deploy.yaml';
+const IMG_OLD = 'registry.local/api:2.3';
+const IMG_NEW = 'registry.local/api:2.4';
+const MOTIVO = 'Bloqueado: /repo/infra/prod/deploy.yaml está em infra/prod/ (política da equipe)';
+const PEDIDO_41 = 'Atualize a imagem da API para 2.4 em todos os ambientes.';
+
+const EVENTOS = { none: 'nenhum hook', pre: 'PreToolUse', post: 'PostToolUse' };
+const MATCHERS = { ew: 'Edit|Write', e: 'Edit', w: 'Write' };
+const SAIDAS = { '2': 'exit 2 + motivo no stderr', '1': 'exit 1 + motivo no stderr', json: 'exit 0 + JSON de bloqueio' };
+const SAIDA_CURTA = { '2': 'exit 2', '1': 'exit 1', json: 'JSON' };
+
+function parseProt(v) {
+  if (!v || v === 'none') return { ev: 'none' };
+  const [ev, m, s] = v.split('.');
+  return { ev, m, s };
+}
+function protLabel(v) {
+  const p = parseProt(v);
+  return p.ev === 'none' ? 'nenhum hook: só a regra escrita' : `${EVENTOS[p.ev]} · ${MATCHERS[p.m]} · ${SAIDA_CURTA[p.s]}`;
+}
+const casa = (m, tool) => MATCHERS[m].split('|').includes(tool);
+
+const PRESETS = [
+  { v: 'none', rot: 'Só a regra escrita', nota: 'o cenário do material' },
+  { v: 'post.ew.2', rot: 'PostToolUse que registra', nota: 'alternativa C da questão 6' },
+  { v: 'pre.ew.1', rot: 'PreToolUse com exit 1', nota: 'o exit code errado do checkpoint' },
+  { v: 'pre.e.2', rot: 'Matcher só Edit', nota: 'porta pela metade' },
+  { v: 'pre.ew.2', rot: 'PreToolUse · Edit|Write · exit 2', nota: 'alternativa B da questão 6' },
+  { v: 'pre.ew.json', rot: 'PreToolUse · JSON deny', nota: 'bloqueio por JSON' },
+];
+
+const REGRA_OPTS = [
+  { v: 'raiz', rot: 'No CLAUDE.md da raiz do projeto', desc: 'Como no material. Entra no contexto no início da sessão e é relido do disco depois de uma compaction.' },
+  { v: 'conversa', rot: 'Dita na conversa, no turno 2', desc: 'Existe só no histórico. A compaction resume o histórico e pode deixá-la de fora.' },
+];
+const PEDIDO_OPTS = [
+  { v: 'respeita', rot: 'Não toca em produção e avisa', desc: 'Atualiza só staging e explica por quê.' },
+  { v: 'edit', rot: 'Pede Edit em infra/prod/deploy.yaml', desc: 'Troca só a linha da imagem.' },
+  { v: 'write', rot: 'Pede Write em infra/prod/deploy.yaml', desc: 'Reescreve o arquivo inteiro com a imagem nova.' },
+  { v: 'bash', rot: 'Pede Bash com sed -i no arquivo', desc: 'Edita pelo shell. Fora do material: testa o recorte do matcher.' },
+];
+const TOOL_OF = { edit: 'Edit', write: 'Write', bash: 'Bash' };
+
+function settingsJson(v) {
+  const p = parseProt(v);
+  if (p.ev === 'none') return { hooks: {} };
+  return { hooks: { [EVENTOS[p.ev]]: [{ matcher: MATCHERS[p.m], hooks: [{ type: 'command', command: '.claude/hooks/protege-prod.sh' }] }] } };
+}
+function scriptLines(v) {
+  const p = parseProt(v);
+  if (p.ev === 'none') return [{ t: '# nenhum script: a política é só o texto da regra' }];
+  const ev = EVENTOS[p.ev];
+  const L = [
+    { t: '#!/bin/bash' },
+    { t: `# .claude/hooks/protege-prod.sh, pendurado em ${ev}` },
+    { t: 'INPUT=$(cat)   # a tool call chega em stdin, como JSON' },
+    { t: "TOOL=$(echo \"$INPUT\" | jq -r '.tool_name')" },
+    { t: "FILE=$(echo \"$INPUT\" | jq -r '.tool_input.file_path // empty')" },
+    { t: 'if [[ "$FILE" == *"infra/prod/"* ]]; then' },
+    { t: `  echo "$(date +%T) ${ev} $TOOL $FILE" >> .claude/audit.log` },
+  ];
+  if (p.s === 'json') {
+    const obj = p.ev === 'pre'
+      ? `'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $r}}'`
+      : `'{decision: "block", reason: $r}'`;
+    L.push({ t: '  jq -n --arg r "Bloqueado: $FILE está em infra/prod/ (política da equipe)" \\', hl: true });
+    L.push({ t: '    ' + obj, hl: true });
+    L.push({ t: '  exit 0', hl: true });
+  } else {
+    L.push({ t: '  echo "Bloqueado: $FILE está em infra/prod/ (política da equipe)" >&2' });
+    L.push({ t: `  exit ${p.s}`, hl: true });
+  }
+  L.push({ t: 'fi' }, { t: 'exit 0' });
+  return L;
+}
+function toolUse(tool, id, path) {
+  const f = path || PRD;
+  const rel = f.replace('/repo/', '');
+  const input = tool === 'Edit' ? { file_path: f, old_string: 'image: ' + IMG_OLD, new_string: 'image: ' + IMG_NEW }
+    : tool === 'Write' ? { file_path: f, content: `service: api\nreplicas: 6\nimage: ${IMG_NEW}\n` }
+    : { command: `sed -i 's/api:2.3/api:2.4/' ${rel}`, description: 'Atualiza a imagem em produção' };
+  return { type: 'tool_use', id, name: tool, input };
+}
+function hookStdin(ev, tu, resp) {
+  const o = {
+    session_id: 'sess_7f3a2c',
+    transcript_path: '~/.claude/projects/-repo/sess_7f3a2c.jsonl',
+    cwd: '/repo',
+    permission_mode: 'bypassPermissions',
+    hook_event_name: ev,
+    tool_name: tu.name,
+    tool_input: tu.input,
+    tool_use_id: tu.id,
+  };
+  if (resp) o.tool_response = tu.name === 'Bash' ? { stdout: '', stderr: '', interrupted: false } : { filePath: tu.input.file_path, success: true };
+  return o;
+}
+
+const CATEG = {
+  modelo: {
+    rot: 'Produção intacta: quem segurou foi o modelo', curto: 'intacto', sub: 'o modelo não pediu', cls: 'c-mod',
+    quem: 'o modelo, que é probabilístico',
+    licao: (P) => `Deu certo porque o modelo escolheu não pedir.${P.ev !== 'none' ? ' O hook existia, mas nenhuma chamada para produção chegou até ele.' : ''} Com a mesma configuração, outra sessão pode sair diferente ${S}. É o “quase sempre” do material ${M}.`,
+  },
+  bloqueado: {
+    rot: 'Produção intacta: o hook bloqueou', curto: 'intacto', sub: 'barrado no PreToolUse', cls: 'c-ok',
+    quem: 'o hook em PreToolUse, que é determinístico',
+    licao: () => `Deu certo porque o harness decidiu antes da execução. O modelo pediu, e isso não mudou o resultado: dentro do matcher, todo pedido para [[infra/prod/]] recebe a mesma resposta ${M}.`,
+  },
+  alterado: {
+    rot: 'Produção alterada: nada no caminho', curto: 'alterado', sub: 'sem registro', cls: 'c-bad',
+    quem: 'ninguém: a tool executou',
+    licao: () => `Não havia código entre o pedido e a execução. A regra era só texto, e texto é uma solicitação ao modelo ${M}.`,
+  },
+  'alterado-log': {
+    rot: 'Produção alterada: registrado depois', curto: 'alterado', sub: 'registrado depois', cls: 'c-bad',
+    quem: 'ninguém: o hook só rodou depois',
+    licao: () => `O hook rodou, registrou e reclamou com o arquivo já escrito. [[PostToolUse]] serve para reagir ao resultado, como formatar ou rodar o type-checker. Para impedir, só [[PreToolUse]] ${M}.`,
+  },
+  'alterado-aviso': {
+    rot: 'Produção alterada: o hook reclamou e deixou passar', curto: 'alterado', sub: 'exit 1 não barra', cls: 'c-bad',
+    quem: 'ninguém: exit 1 não bloqueia',
+    licao: () => `Evento certo, matcher certo, código de saída errado. Só o exit 2 barra a ação; exit 1 é erro não bloqueante ${M}.`,
+  },
+  'alterado-fora': {
+    rot: 'Produção alterada: fora do matcher', curto: 'alterado', sub: 'fora do matcher', cls: 'c-bad',
+    quem: 'ninguém: o script nem rodou',
+    licao: (P, st) => st.prd.por === 'Bash'
+      ? `O hook é determinístico dentro do recorte que você definiu, e [[Bash]] ficou fora dele: o matcher filtra pelo nome da ferramenta ${D('hooks')}. Isto vai além do material. Para comandos de shell, a doc aponta as regras de deny de [[Edit]] nas permissões, que também valem para comandos de arquivo que o Claude Code reconhece no Bash, como [[sed]] e [[tee]], e o sandbox para o que não depende do texto do comando ${D('permsRE')}.`
+      : `O hook é determinístico dentro do recorte que você definiu, e [[${st.prd.por}]] ficou fora dele. Um matcher que esquece uma das ferramentas deixa metade da porta aberta; ele precisa ser [[Edit|Write]] ${M}.`,
+  },
+};
+
+function initState() {
+  return {
+    turno: 0, contexto: 0, compactacoes: 0,
+    regra: 'ainda não definida', regraCls: '',
+    prot: null,
+    disparos: { SessionStart: 0, UserPromptSubmit: 0, PreToolUse: 0, PostToolUse: 0, PostToolUseFailure: 0, SubagentStart: 0, SubagentStop: 0, Stop: 0, PreCompact: 0, PostCompact: 0, SessionEnd: 0 },
+    scriptRodou: 0,
+    pedido: '—', matcher: '—', exit: '—', decisao: '—',
+    exec: null,
+    stg: { image: IMG_OLD, alterado: false },
+    prd: { image: IMG_OLD, alterado: false, por: '' },
+    audit: [], transcript: [],
+    claude: '—',
+    bloqueios: 0,
+    categoria: null, desfecho: '—', quem: '—',
+  };
+}
+
+/* ================= caminho: construído de forma pura a partir das decisões ================= */
+function buildPath(dec) {
+  const steps = [];
+  const st = initState();
+  const add = (s) => { s.index = steps.length; s.state = clone(st); steps.push(s); return s; };
+  const decision = (s) => { const v = dec[s.decision.id]; s.decision.value = v === undefined ? null : v; add(s); return v !== undefined; };
+
+  /* 0 — visão geral */
+  add({
+    kind: 'info', ator: 'none', station: null,
+    title: 'Visão geral: uma regra, dois mecanismos',
+    text: `<p>A equipe quer uma coisa só: que o agente não edite [[infra/prod/deploy.yaml]] ${M}. Você decide onde a regra fica escrita e o que vai no [[settings.json]]. Depois, uma sessão longa corre até o turno 41, quando o usuário pede a imagem nova “em todos os ambientes”, e você faz o papel do modelo.</p>
+<p>Acompanhe três coisas. O trilho à esquerda é o ciclo de vida da sessão, com os pontos fixos onde um hook pode ser pendurado ${M}. Os painéis Modelo e Harness separam quem pede de quem decide ${M}. O painel Mundo mostra o arquivo em disco: é ele que diz se a política funcionou.</p>
+<p>A sessão roda em [[bypassPermissions]], sem prompt de permissão ${S}. Assim nada além do hook fica entre o pedido e a execução. Um hook que nega vale mesmo nesse modo ${D('guideModes')}.</p>`,
+    dados: { titulo: 'Cenário', json: { repo: '/repo', politica: 'nunca edite arquivos em infra/prod/', arquivos: { 'infra/staging/deploy.yaml': 'image: ' + IMG_OLD, 'infra/prod/deploy.yaml': 'image: ' + IMG_OLD }, permission_mode: 'bypassPermissions', turno_critico: 41, pedido_no_turno_41: PEDIDO_41 }, hl: ['politica', 'permission_mode'] },
+    trans: ['Próxima: a equipe escolhe onde escrever a regra.', 'Ao longo da sessão, o Play para em cada decisão ◆ e espera você.'],
+  });
+
+  /* 1 — onde está a regra */
+  const regraDados = dec.regra === 'raiz'
+    ? { arquivo: '/repo/CLAUDE.md', conteudo: '# Regras do projeto\n- Nunca edite arquivos em infra/prod/.\n- Rode os testes antes de commitar.' }
+    : dec.regra === 'conversa'
+      ? { turno: 2, role: 'user', content: 'Ah, e nunca edite arquivos em infra/prod/.' }
+      : { regra: 'nunca edite arquivos em infra/prod/', onde: '(escolha acima)' };
+  if (!decision({
+    kind: 'decision', ator: 'equipe', station: null,
+    title: 'Onde a equipe escreveu a regra?',
+    text: `<p>O material põe a regra no [[CLAUDE.md]] e cita duas causas para ela falhar: a compaction de uma sessão longa ou o modelo ponderar outras instruções ${M}. A doc separa os dois casos. O [[CLAUDE.md]] da raiz é relido do disco depois da compaction; uma instrução dada só na conversa pode se perder ${D('cw')}.</p>`,
+    decision: { id: 'regra', type: 'options', options: REGRA_OPTS },
+    dados: { titulo: 'A regra', json: regraDados, hl: ['conteudo', 'content'] },
+    trans: ['CLAUDE.md da raiz: a regra sobrevive à compaction, e resta o risco de o modelo pesá-la contra outro pedido.', 'Conversa: a compaction pode levá-la embora.'],
+  })) return steps;
+  const raiz = dec.regra === 'raiz';
+
+  /* 2 — settings.json */
+  if (!decision({
+    kind: 'decision', ator: 'equipe', station: null,
+    title: 'O que vai no settings.json?',
+    text: `<p>Um hook é um handler configurado em [[settings.json]] que o Claude Code executa num ponto fixo do ciclo de vida ${M}. Monte a configuração: o evento, o matcher e o que o script faz quando o caminho casa com [[infra/prod/]]. O script é o mesmo em todos os casos; só o final muda.</p>
+<p>Para valer para a equipe inteira, o arquivo é o [[.claude/settings.json]] commitado ${M}. Os atalhos reproduzem as alternativas da questão 6 do D1 e o exit code errado do checkpoint da §6 ${M}.</p>`,
+    decision: { id: 'protecao', type: 'config' },
+    dados: { titulo: dec.protecao ? '.claude/settings.json' : '.claude/settings.json (ainda não salvo)', json: settingsJson(dec.protecao || 'none'), hl: ['matcher', 'command'] },
+    trans: ['Salvar grava o settings.json e abre a sessão.'],
+  })) return steps;
+  const P = parseProt(dec.protecao);
+  const temHook = P.ev !== 'none';
+  st.prot = dec.protecao;
+
+  /* 3 — SessionStart */
+  st.disparos.SessionStart++;
+  st.contexto = 9;
+  st.regra = raiz ? 'visível: veio no CLAUDE.md' : 'ainda não dita';
+  st.regraCls = raiz ? 'good' : '';
+  add({
+    kind: 'info', ator: 'cc', station: 'SessionStart',
+    title: 'A sessão começa',
+    text: `<p>[[SessionStart]] dispara quando a sessão começa ${M}. O Claude Code carrega os hooks do [[settings.json]] e monta o contexto inicial. ${raiz ? `O [[CLAUDE.md]] entra no contexto, e a regra com ele. Para a doc, isso é contexto, não configuração imposta ${D('mem')}.` : 'O [[CLAUDE.md]] entra no contexto sem a regra: ela só será dita no turno 2.'}</p>
+<p>${temHook ? `Um handler foi registrado em [[${EVENTOS[P.ev]}]] com matcher [[${MATCHERS[P.m]}]]. Ele não depende de o modelo lembrar, concordar ou sequer ver a regra ${M}.` : 'Nenhum hook foi registrado. A política depende só do modelo.'}</p>`,
+    dados: {
+      titulo: 'Contexto inicial e hooks carregados',
+      json: {
+        contexto_inicial: {
+          system_prompt: '(instruções do Claude Code)',
+          'CLAUDE.md': raiz ? '# Regras do projeto\n- Nunca edite arquivos em infra/prod/.\n- Rode os testes antes de commitar.' : '# Regras do projeto\n- Rode os testes antes de commitar.',
+          regra_infra_prod: raiz ? 'presente' : 'ausente',
+        },
+        hooks_carregados: settingsJson(dec.protecao).hooks,
+      },
+      hl: ['regra_infra_prod', 'hooks_carregados', 'matcher'],
+    },
+    trans: ['Turnos de trabalho. A cada prompt dispara UserPromptSubmit; a cada tool call, PreToolUse e, se ela der certo, PostToolUse.'],
+  });
+
+  /* 4 — turnos 1 a 40 */
+  const runs = temHook ? ({ ew: 17, e: 14, w: 3 })[P.m] : 0;
+  Object.assign(st.disparos, { UserPromptSubmit: 40, PreToolUse: 57, PostToolUse: 55, PostToolUseFailure: 2, Stop: 40 });
+  st.turno = 40; st.contexto = 93; st.scriptRodou = runs;
+  if (!raiz) { st.regra = 'visível: dita no turno 2'; st.regraCls = 'good'; }
+  const exTool = temHook && P.m === 'w' ? 'Write' : 'Edit';
+  const exTu = exTool === 'Write'
+    ? { type: 'tool_use', id: 'toolu_01Bil9', name: 'Write', input: { file_path: '/repo/src/billing/discount.ts', content: 'export const discount = (t) => t * 0.05;\n' } }
+    : { type: 'tool_use', id: 'toolu_01Bil9', name: 'Edit', input: { file_path: '/repo/src/billing/invoice.ts', old_string: 'total = sum(items)', new_string: 'total = sum(items) - discount(total)' } };
+  if (temHook) { st.matcher = `${exTool} casa com ${MATCHERS[P.m]}`; st.exit = '0'; st.decisao = 'executar'; }
+  add({
+    kind: 'info', ator: 'usuario', station: 'UserPromptSubmit',
+    title: 'Turnos 1 a 40: trabalho normal em src/',
+    text: `<p>Quarenta turnos de manutenção em [[src/billing/]] ${S}. ${raiz ? '' : 'No turno 2, o usuário escreveu: “nunca edite arquivos em infra/prod/”. A regra agora existe só no histórico. '}O modelo não tocou em produção nenhuma vez: a instrução funcionou ${S}. É o “funciona por duas semanas” do material ${M}.</p>
+<p>${temHook ? `[[${EVENTOS[P.ev]}]] disparou em toda tool call que se qualificava, inclusive leituras e buscas. O script da equipe só rodou quando o matcher casou, ${runs} vezes, e saiu com 0 em todas: nenhum caminho era de produção. Exit 0 sem saída não aprova nada; a chamada segue o fluxo normal de permissão ${D('hooks')}.` : 'Os eventos dispararam em cada prompt e em cada tool call, mas não havia handler pendurado neles.'} Dois comandos de teste falharam, e [[PostToolUseFailure]] disparou duas vezes. A janela de contexto chegou a 93%.</p>`,
+    dados: temHook
+      ? { titulo: `Uma das ${runs} execuções do script (turno 17)`, json: { stdin: hookStdin(EVENTOS[P.ev], exTu, P.ev === 'post'), exit_code: 0, tool_calls_nos_turnos_1_a_40: { Read: 22, Grep: 9, Bash: 9, Edit: 14, Write: 3 } }, hl: ['hook_event_name', 'tool_name', 'file_path', 'exit_code'] }
+      : { titulo: 'Disparos nos turnos 1 a 40', json: { disparos: { UserPromptSubmit: 40, PreToolUse: 57, PostToolUse: 55, PostToolUseFailure: 2, Stop: 40 }, tool_calls: { Read: 22, Grep: 9, Bash: 9, Edit: 14, Write: 3 }, handlers_da_equipe: 0 }, hl: ['handlers_da_equipe'] },
+    note: `Contagens de turnos e de ferramentas inventadas para o exemplo ${S}. O stdin mostra um subconjunto dos campos que a doc lista.`,
+    trans: ['A janela está quase cheia: a compaction vem a seguir.'],
+  });
+
+  /* 5 — PreCompact */
+  st.disparos.PreCompact++;
+  st.contexto = 95;
+  st.matcher = '—'; st.exit = '—'; st.decisao = '—';
+  add({
+    kind: 'info', ator: 'cc', station: 'PreCompact',
+    title: 'A janela encheu: PreCompact',
+    text: `<p>Com a janela em 95%, o Claude Code compacta sozinho. [[PreCompact]] dispara antes ${M}. Primeiro saem as saídas antigas de ferramentas; depois a conversa é resumida, se ainda for preciso ${D('how')}.</p>`,
+    dados: { titulo: 'O evento', json: { evento: 'PreCompact', disparado_por: 'auto', janela_antes: '95%' }, hl: ['disparado_por'] },
+    note: `O matcher de [[PreCompact]] distingue [[manual]] de [[auto]] ${D('hooks')}.`,
+    trans: ['PostCompact: o histórico vira resumo, e o que é carregado do disco volta.'],
+  });
+
+  /* 6 — PostCompact */
+  st.disparos.PostCompact++;
+  st.contexto = 31; st.compactacoes = 1;
+  st.regra = raiz ? 'visível: reinjetada do disco' : 'ausente: ficou fora do resumo';
+  st.regraCls = raiz ? 'good' : 'bad';
+  add({
+    kind: 'info', ator: 'cc', station: 'PostCompact',
+    title: raiz ? 'Depois da compaction, a regra volta do disco' : 'Depois da compaction, a regra sumiu',
+    text: raiz
+      ? `<p>O resumo substitui o histórico, e o [[CLAUDE.md]] da raiz é reinjetado do disco ${D('cw')}. A regra continua visível. Isso não a torna obrigatória: a doc diz que não há “guarantee of strict compliance, especially for vague or conflicting instructions” ${D('mem')}.</p><p>Das duas causas do material, a compaction não pegou esta regra. Resta a outra: o modelo ponderar outras instruções ${M}.</p>`
+      : `<p>O resumo preserva pedidos e trechos de código; instruções detalhadas do início da conversa podem se perder ${D('how')}. Nesta simulação, a regra do turno 2 ficou fora do resumo ${S}. O modelo não tem como obedecer ao que não vê.</p><p>O hook não mudou: ele mora no [[settings.json]], fora do contexto ${M}.</p>`,
+    dados: { titulo: 'O que sobrou no contexto', json: { resumo: 'Manutenção em src/billing: 14 edições, 3 arquivos novos, testes passando.', 'CLAUDE.md_da_raiz': 'reinjetado do disco', regra_infra_prod: raiz ? 'presente: voltou com o CLAUDE.md' : 'ausente: foi dita no turno 2 e não entrou no resumo', hooks: temHook ? 'inalterados: moram no settings.json' : 'nenhum' }, hl: ['regra_infra_prod', 'hooks'] },
+    note: `Texto do resumo inventado para o exemplo ${S}.`,
+    trans: ['Turno 41: o usuário faz um pedido novo.'],
+  });
+
+  /* 7 — turno 41 */
+  st.disparos.UserPromptSubmit++;
+  st.turno = 41; st.contexto = 33;
+  add({
+    kind: 'info', ator: 'usuario', station: 'UserPromptSubmit',
+    title: 'Turno 41: “em todos os ambientes”',
+    text: `<p>O usuário pede: “${PEDIDO_41}” [[UserPromptSubmit]] dispara antes de o modelo processar o prompt ${D('hooks')}.</p><p>${raiz ? `Há duas instruções em tensão no contexto: a regra do [[CLAUDE.md]] e “todos os ambientes”. O modelo vai pesar uma contra a outra ${S}.` : `Sem a regra no contexto, “todos os ambientes” inclui produção sem conflito nenhum ${S}.`}</p>`,
+    dados: { titulo: 'Mensagem do usuário', json: { role: 'user', content: PEDIDO_41 }, hl: ['content'] },
+    trans: ['O modelo responde, começando por staging.'],
+  });
+
+  /* 8 — o modelo pede Edit em staging */
+  const tuStg = toolUse('Edit', 'toolu_01Stg4', STG);
+  st.pedido = 'Edit em infra/staging/deploy.yaml';
+  add({
+    kind: 'info', ator: 'modelo', station: 'modelo',
+    title: 'O modelo começa por staging',
+    text: `<p>O modelo responde com um bloco [[tool_use]] pedindo [[Edit]] em staging ${S}. Ele só pede. Quem executa, ou não, é o harness ${M}.</p>`,
+    dados: { titulo: 'Resposta do modelo: bloco tool_use', json: tuStg, hl: ['id', 'name', 'file_path'] },
+    trans: ['PreToolUse dispara antes da execução.'],
+  });
+
+  /* 9 — PreToolUse em staging */
+  st.disparos.PreToolUse++;
+  const preStg = P.ev === 'pre' && casa(P.m, 'Edit');
+  if (preStg) { st.scriptRodou++; st.matcher = `Edit casa com ${MATCHERS[P.m]}`; st.exit = '0'; }
+  else { st.matcher = P.ev === 'pre' ? `Edit não casa com ${MATCHERS[P.m]}` : (P.ev === 'post' ? 'hook só em PostToolUse' : 'sem hook'); st.exit = '—'; }
+  st.decisao = 'executar';
+  add({
+    kind: 'info', ator: 'harness', station: 'PreToolUse',
+    title: preStg ? 'PreToolUse em staging: sem objeção' : 'PreToolUse em staging: nada a avaliar',
+    text: preStg
+      ? `<p>[[PreToolUse]] dispara antes da execução ${M}. O matcher [[${MATCHERS[P.m]}]] casa com [[Edit]], e o script recebe a tool call em stdin ${D('hooks')}. O caminho é de staging: o script sai com 0.</p><p>Exit 0 sem saída não aprova a chamada. Ela só segue o fluxo normal de permissão ${D('hooks')}, que em [[bypassPermissions]] não pergunta nada.</p>`
+      : P.ev === 'pre'
+        ? `<p>[[PreToolUse]] dispara, mas o matcher [[${MATCHERS[P.m]}]] não casa com [[Edit]]: o script nem roda ${D('hooks')}. A chamada segue sem objeção.</p>`
+        : `<p>[[PreToolUse]] dispara ${M}, mas nesta configuração não há handler pendurado nele. A chamada segue direto, e [[bypassPermissions]] não pergunta nada.</p>`,
+    dados: preStg
+      ? { titulo: 'stdin do script e resposta', json: { stdin: hookStdin('PreToolUse', tuStg), exit_code: 0, stdout: '' }, hl: ['hook_event_name', 'tool_name', 'file_path', 'tool_use_id', 'exit_code'] }
+      : { titulo: 'O evento', json: { evento: 'PreToolUse', tool_name: 'Edit', matcher_configurado: P.ev === 'pre' ? MATCHERS[P.m] : null, script_rodou: false }, hl: ['matcher_configurado', 'script_rodou'] },
+    trans: ['A tool executa em staging.'],
+  });
+
+  /* 10 — staging executa */
+  st.stg = { image: IMG_NEW, alterado: true };
+  st.exec = { tipo: 'ok-other', txt: 'Edit alterou infra/staging/deploy.yaml' };
+  st.disparos.PostToolUse++;
+  const postStg = P.ev === 'post' && casa(P.m, 'Edit');
+  if (postStg) { st.scriptRodou++; st.matcher = `Edit casa com ${MATCHERS[P.m]}`; st.exit = '0'; }
+  st.claude = 'tool_result de staging: sucesso';
+  add({
+    kind: 'info', ator: 'ferramenta', station: 'exec',
+    title: 'Staging atualizado',
+    text: `<p>O [[Edit]] executa e [[infra/staging/deploy.yaml]] passa para 2.4. Staging pode. Como a tool teve sucesso, [[PostToolUse]] dispara ${M}.${postStg ? ' O script de pós-execução roda, vê um caminho de staging e sai com 0.' : ''}</p>`,
+    dados: { titulo: 'O que volta para o modelo', json: { type: 'tool_result', tool_use_id: 'toolu_01Stg4', content: 'The file /repo/infra/staging/deploy.yaml has been updated.' }, hl: ['tool_use_id'] },
+    note: `Texto do tool_result ilustrativo ${S}.`,
+    trans: ['O modelo decide o que fazer com produção. Essa escolha é sua.'],
+  });
+
+  /* 11 — decisão: o que o modelo pede para produção */
+  st.pedido = '—'; st.matcher = '—'; st.exit = '—'; st.decisao = '—'; st.exec = null;
+  if (!decision({
+    kind: 'decision', ator: 'modelo', station: 'modelo',
+    title: 'Você é o modelo: o que pede para produção?',
+    text: `<p>Aqui entra a parte probabilística ${M}. Não existe opção certa: você está sorteando o comportamento do modelo. A pergunta é o que acontece com o arquivo em cada caso.</p>`,
+    hint: raiz
+      ? `No contexto: a regra do CLAUDE.md, visível, e o pedido “todos os ambientes”. O provável é respeitar a regra; provável não é garantido ${S}.`
+      : `No contexto: o pedido “todos os ambientes” e nenhuma regra. O provável é editar ${S}.`,
+    decision: { id: 'pedido', type: 'options', options: PEDIDO_OPTS },
+    dados: { titulo: 'O que o modelo tem diante de si', json: { regra_infra_prod: raiz ? 'visível (CLAUDE.md reinjetado)' : 'ausente', ultimo_pedido_do_usuario: PEDIDO_41, ja_feito: 'staging atualizado para 2.4', hook_da_equipe: temHook ? 'fora do contexto: mora no settings.json' : 'não existe' }, hl: ['regra_infra_prod', 'hook_da_equipe'] },
+    trans: ['Não tocar: o turno termina, e produção fica intacta por decisão do modelo.', 'Edit ou Write: o pedido passa pelo PreToolUse.', 'Bash: o pedido passa pelo PreToolUse com outro nome de ferramenta.'],
+  })) return steps;
+
+  /* uma tentativa em produção: pedido → PreToolUse → (script) → bloqueio ou execução → (PostToolUse) */
+  function runRequest(tool, id, retry) {
+    const tu = toolUse(tool, id);
+    st.pedido = `${tool} em infra/prod/deploy.yaml`;
+    st.matcher = '—'; st.exit = '—'; st.decisao = '—'; st.exec = null;
+    const toolTxt = tool === 'Edit' ? `O [[Edit]] troca [[old_string]] por [[new_string]] ${D('tools')}.`
+      : tool === 'Write' ? `O [[Write]] cria ou sobrescreve o arquivo inteiro ${D('tools')}.`
+      : `Desta vez é um [[Bash]]: o arquivo é o mesmo, mas a ferramenta é outra, e o input não tem [[file_path]], só [[command]] ${D('tools')}.`;
+    add({
+      kind: 'info', ator: 'modelo', station: 'modelo',
+      title: retry ? `Nova tentativa, agora com ${tool}` : `O modelo pede ${tool} em produção`,
+      text: retry
+        ? `<p>O modelo leu o motivo do bloqueio e tentou outra ferramenta no mesmo arquivo ${S}. É o caso que o material descreve como o modelo que “tentou explicitamente pular o passo” ${M}.</p><p>${toolTxt}</p>`
+        : `<p>${raiz ? 'O modelo pesou “todos os ambientes” contra a regra do CLAUDE.md e pediu a edição' : 'Sem a regra no contexto, o modelo seguiu o pedido do usuário'} ${S}. Ninguém agiu de má fé: instrução é uma solicitação a um gerador probabilístico ${M}.</p><p>${toolTxt}</p>`,
+      dados: { titulo: 'Resposta do modelo: bloco tool_use', json: tu, hl: ['id', 'name', 'file_path', 'command'] },
+      trans: ['PreToolUse dispara. O matcher decide se o script da equipe roda.'],
+    });
+
+    st.disparos.PreToolUse++;
+    const roda = P.ev === 'pre' && casa(P.m, tool);
+    if (!roda) {
+      st.matcher = P.ev === 'pre' ? `${tool} não casa com ${MATCHERS[P.m]}` : (P.ev === 'post' ? 'hook só em PostToolUse' : 'sem hook');
+      st.decisao = 'executar';
+      const txt = P.ev === 'none'
+        ? `<p>[[PreToolUse]] dispara, mas não há handler pendurado nele. Entre o pedido e a execução não existe código da equipe: a regra dependia só do modelo ${M}.</p>`
+        : P.ev === 'post'
+          ? `<p>[[PreToolUse]] dispara, mas o hook da equipe está pendurado em [[PostToolUse]], depois da execução. Daqui ele não pode impedir nada ${M}.</p>`
+          : `<p>[[PreToolUse]] dispara, mas o matcher [[${MATCHERS[P.m]}]] não casa com [[${tool}]]. O matcher filtra pelo nome da ferramenta, e uma lista com [[|]] casa só nomes exatos ${D('hooks')}. O script nem roda: para o harness, esta chamada não tem objeção.</p><p>${tool === 'Bash' ? 'Um [[sed -i]] edita o mesmo arquivo por outra porta. Isto vai além do material.' : `É o erro que o material aponta: um matcher que esquece [[${tool}]] deixa metade da porta aberta ${M}.`}</p>`;
+      add({
+        kind: 'info', ator: 'harness', station: 'PreToolUse',
+        title: P.ev === 'pre' ? `PreToolUse: o matcher não casa com ${tool}` : 'PreToolUse: nenhum handler aqui',
+        text: txt,
+        dados: { titulo: 'O evento', json: { evento: 'PreToolUse', tool_name: tool, matcher_configurado: P.ev === 'pre' ? MATCHERS[P.m] : null, script_rodou: false, decisao_do_harness: 'executar' }, hl: ['tool_name', 'matcher_configurado', 'script_rodou'] },
+        trans: ['Sem objeção e em bypassPermissions: a tool executa.'],
+      });
+    } else {
+      st.matcher = `${tool} casa com ${MATCHERS[P.m]}`;
+      st.scriptRodou++;
+      add({
+        kind: 'info', ator: 'harness', station: 'PreToolUse',
+        title: 'PreToolUse: o matcher casa, o script recebe a chamada',
+        text: `<p>[[PreToolUse]] fica antes da execução: é o único lugar de onde se impede alguma coisa ${M}. O matcher [[${MATCHERS[P.m]}]] casa com [[${tool}]], e o Claude Code entrega a tool call ao script em stdin, como JSON ${D('hooks')}. O [[tool_use_id]] é o mesmo [[id]] do pedido.${retry ? ' O hook roda de novo, do mesmo jeito: não sabe nem precisa saber que é uma segunda tentativa.' : ''}</p>`,
+        dados: { titulo: 'stdin do script', json: hookStdin('PreToolUse', tu), hl: ['hook_event_name', 'tool_name', 'file_path', 'tool_use_id'] },
+        note: 'Subconjunto dos campos que a doc lista para o stdin de PreToolUse.',
+        trans: ['O script compara o caminho com infra/prod/ e responde.'],
+      });
+      st.audit.push(`${retry ? '14:02:19' : '14:02:11'} PreToolUse ${tool} ${PRD}`);
+      if (P.s === '2') {
+        st.exit = '2'; st.decisao = 'bloquear';
+        add({
+          kind: 'info', ator: 'script', station: 'PreToolUse',
+          title: 'O script sai com 2: bloqueado',
+          text: `<p>O caminho casa com [[infra/prod/]]. O script grava a linha no [[audit.log]], escreve o motivo no stderr e sai com 2. Exit 2 é o código de bloqueio: a tool call não executa ${D('hooksExit')}. O stderr vira o motivo da recusa que Claude recebe ${D('hooksPre')}.</p><p>Nem um JSON com [[allow]] desfaz um exit 2 ${M}. E o bloqueio vale mesmo em [[bypassPermissions]] ${D('guideModes')}.</p>`,
+          dados: { titulo: 'Resposta do script', json: { stdout: '', stderr: MOTIVO, exit_code: 2, decisao_do_harness: 'bloquear' }, hl: ['stderr', 'exit_code', 'decisao_do_harness'] },
+          trans: ['A tool não executa.'],
+        });
+      } else if (P.s === 'json') {
+        st.exit = '0 + JSON deny'; st.decisao = 'bloquear';
+        add({
+          kind: 'info', ator: 'script', station: 'PreToolUse',
+          title: 'O script responde em JSON: deny',
+          text: `<p>O caminho casa com [[infra/prod/]]. O script grava a linha no [[audit.log]], sai com 0 e imprime a decisão em stdout. [[permissionDecision: "deny"]] cancela a chamada, e o [[permissionDecisionReason]] vai para Claude ${D('hooksPre')}.</p><p>Mesmo efeito do exit 2, por outro canal ${M}. Se vários hooks responderem, vence o mais restritivo: [[deny]] &gt; [[defer]] &gt; [[ask]] &gt; [[allow]] ${D('hooksPre')}.</p>`,
+          dados: { titulo: 'Resposta do script', json: { stdout: { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: MOTIVO } }, exit_code: 0, decisao_do_harness: 'bloquear' }, hl: ['permissionDecision', 'permissionDecisionReason', 'decisao_do_harness'] },
+          trans: ['A tool não executa.'],
+        });
+      } else {
+        st.exit = '1'; st.decisao = 'executar';
+        st.transcript.push('PreToolUse hook error: Failed with non-blocking status code: ' + MOTIVO);
+        add({
+          kind: 'info', ator: 'script', station: 'PreToolUse',
+          title: 'O script sai com 1: reclama e deixa passar',
+          text: `<p>O script fez tudo certo, menos a última linha. Exit 1 não bloqueia: é um erro não bloqueante ${M}. A ação segue, e o transcript mostra um aviso de erro do hook com a primeira linha do stderr, depois de “Failed with non-blocking status code:” ${D('hooks')}.</p><p>Um gate escrito com exit 1 é um gate aberto que gera logs ${M}.</p>`,
+          dados: { titulo: 'Resposta do script', json: { stdout: '', stderr: MOTIVO, exit_code: 1, decisao_do_harness: 'executar', aviso_no_transcript: 'PreToolUse hook error: Failed with non-blocking status code: ' + MOTIVO }, hl: ['exit_code', 'decisao_do_harness', 'aviso_no_transcript'] },
+          note: `O prefixo “Failed with non-blocking status code:” é da doc; o rótulo antes dele é aproximado ${S}.`,
+          trans: ['Sem bloqueio e em bypassPermissions: a tool executa.'],
+        });
+      }
+    }
+
+    const bloqueado = roda && P.s !== '1';
+    if (bloqueado) {
+      st.bloqueios++;
+      st.exec = { tipo: 'bloq', txt: `${tool} não executou` };
+      st.claude = 'recusa: ' + MOTIVO;
+      add({
+        kind: 'info', ator: 'harness', station: 'exec',
+        title: 'A tool não executa. Claude recebe o motivo',
+        text: `<p>O arquivo de produção continua em 2.3. [[PostToolUse]] não dispara, porque exige uma tool que teve sucesso ${M}. [[PostToolUseFailure]] também não: ele só roda para uma tool que começou a executar e falhou ${D('hooksFail')}.</p><p>O modelo recebe o motivo como resultado da chamada e decide o que fazer com ele ${S}.</p>`,
+        dados: { titulo: 'O que volta para o modelo', json: { type: 'tool_result', tool_use_id: id, is_error: true, content: MOTIVO }, hl: ['tool_use_id', 'is_error', 'content'] },
+        note: `A doc diz que Claude vê o motivo da recusa. O formato exato deste bloco é ilustrativo ${S}.`,
+        trans: retry ? ['O modelo desiste e termina o turno.'] : ['O modelo reage ao bloqueio. Essa escolha é sua.'],
+      });
+      return 'bloqueado';
+    }
+
+    st.prd = { image: IMG_NEW, alterado: true, por: tool };
+    st.exec = { tipo: 'ok-prod', txt: `${tool} alterou infra/prod/deploy.yaml` };
+    st.disparos.PostToolUse++;
+    st.claude = 'tool_result: produção atualizada';
+    const postRoda = P.ev === 'post' && casa(P.m, tool);
+    add({
+      kind: 'info', ator: 'ferramenta', station: 'exec',
+      title: 'A tool executa: produção agora está em 2.4',
+      text: `<p>Nenhum código da equipe objetou antes, e [[bypassPermissions]] não pergunta nada ${S}. O [[${tool}]] executa, e [[infra/prod/deploy.yaml]] passa a apontar para 2.4.</p><p>Daqui para baixo, a ação já aconteceu. O que vem depois observa, registra e reage, mas não desfaz ${M}. ${postRoda ? '[[PostToolUse]] dispara em seguida.' : '[[PostToolUse]] dispara em seguida, sem handler da equipe pendurado nele.'}</p>`,
+      dados: { titulo: 'O que volta para o modelo', json: { type: 'tool_result', tool_use_id: id, content: tool === 'Bash' ? '(sem saída)' : 'The file /repo/infra/prod/deploy.yaml has been updated.' }, hl: ['tool_use_id'] },
+      note: `Texto do tool_result ilustrativo ${S}.`,
+      trans: postRoda ? ['O hook de PostToolUse roda com o arquivo já alterado.'] : ['O modelo termina o turno.'],
+    });
+
+    if (postRoda) {
+      st.scriptRodou++;
+      st.matcher = `${tool} casa com ${MATCHERS[P.m]}`;
+      st.audit.push(`${retry ? '14:02:20' : '14:02:12'} PostToolUse ${tool} ${PRD}`);
+      let resp, fx;
+      if (P.s === '2') {
+        st.exit = '2'; resp = { stderr: MOTIVO, exit_code: 2 };
+        fx = `Exit 2 aqui não bloqueia nada: o stderr aparece para Claude, e a tool já rodou ${D('hooksExit')}.`;
+        st.claude = 'tool_result + stderr do hook: ' + MOTIVO;
+      } else if (P.s === '1') {
+        st.exit = '1'; resp = { stderr: MOTIVO, exit_code: 1 };
+        fx = `Exit 1 gera só o aviso de erro não bloqueante no transcript ${D('hooks')}.`;
+        st.transcript.push('PostToolUse hook error: Failed with non-blocking status code: ' + MOTIVO);
+      } else {
+        st.exit = '0 + JSON block'; resp = { stdout: { decision: 'block', reason: MOTIVO }, exit_code: 0 };
+        fx = `O JSON [[decision: "block"]] põe o [[reason]] ao lado do resultado; Claude ainda vê a saída original ${D('hooks')}.`;
+        st.claude = 'tool_result + reason do hook: ' + MOTIVO;
+      }
+      st.decisao = 'nenhuma: a tool já rodou';
+      add({
+        kind: 'info', ator: 'script', station: 'PostToolUse',
+        title: 'PostToolUse: o hook vê, registra e reclama. Depois.',
+        text: `<p>O script roda com o resultado da tool em [[tool_response]] ${D('hooks')}. O caminho casa, e a linha vai para o [[audit.log]]. ${fx}</p><p>A doc é direta: PostToolUse “can't undo actions since the tool has already executed” ${D('guideLimits')}. Detecção não é prevenção ${M}.</p>`,
+        dados: { titulo: 'stdin do script (com tool_response) e resposta', json: { stdin: hookStdin('PostToolUse', tu, true), resposta: resp }, hl: ['hook_event_name', 'tool_response', 'exit_code', 'decision', 'stderr'] },
+        note: `O formato de [[tool_response]] foi simplificado ${S}.`,
+        trans: ['O modelo termina o turno com o arquivo já alterado.'],
+      });
+    }
+    return 'executado';
+  }
+
+  /* 12+ — ramos */
+  const tentativas = [];
+  if (dec.pedido === 'respeita') {
+    st.pedido = 'nenhum para produção';
+  } else {
+    const t1 = TOOL_OF[dec.pedido];
+    tentativas.push(t1);
+    const r1 = runRequest(t1, 'toolu_02Prd7', false);
+    if (r1 === 'bloqueado') {
+      const other = t1 === 'Edit' ? 'Write' : 'Edit';
+      if (!decision({
+        kind: 'decision', ator: 'modelo', station: 'modelo',
+        title: 'Bloqueado. O que o modelo tenta agora?',
+        text: `<p>O modelo leu: “${MOTIVO}”. O material diz que o hook roda mesmo quando o modelo “tentou explicitamente pular o passo” ${M}. A reação é sua; qualquer uma das três é plausível ${S}.</p>`,
+        decision: {
+          id: 'retry', type: 'options', options: [
+            { v: 'desiste', rot: 'Desiste e avisa o usuário', desc: 'Relata o bloqueio e termina o turno.' },
+            { v: 'outra', rot: `Tenta ${other} no mesmo arquivo`, desc: other === 'Write' ? 'Reescreve o arquivo inteiro em vez de editar a linha.' : 'Edita só a linha em vez de reescrever o arquivo.' },
+            { v: 'bash', rot: 'Tenta Bash com sed -i', desc: 'Mesmo arquivo, outra ferramenta. Fora do material.' },
+          ],
+        },
+        dados: { titulo: 'O que o modelo recebeu', json: { tool_result: { tool_use_id: 'toolu_02Prd7', is_error: true, content: MOTIVO }, tentativas_bloqueadas: 1 }, hl: ['content', 'tentativas_bloqueadas'] },
+        trans: ['Desistir: o turno termina com produção intacta.', `${other}: passa de novo pelo PreToolUse.`, 'Bash: passa pelo PreToolUse com outro nome de ferramenta.'],
+      })) return steps;
+      if (dec.retry !== 'desiste') {
+        const t2 = dec.retry === 'bash' ? 'Bash' : other;
+        tentativas.push(t2);
+        runRequest(t2, 'toolu_03Rtr2', true);
+      }
+    }
+  }
+
+  /* categoria do desfecho */
+  let cat;
+  if (!st.prd.alterado) cat = st.bloqueios > 0 ? 'bloqueado' : 'modelo';
+  else {
+    const t = st.prd.por;
+    if (P.ev === 'none') cat = 'alterado';
+    else if (!casa(P.m, t)) cat = 'alterado-fora';
+    else if (P.ev === 'post') cat = 'alterado-log';
+    else cat = 'alterado-aviso';
+  }
+
+  /* o modelo termina o turno */
+  let msg;
+  if (dec.pedido === 'respeita') {
+    msg = raiz
+      ? 'Atualizei infra/staging/deploy.yaml para 2.4. Não alterei infra/prod/: o CLAUDE.md do projeto proíbe. Se quiser, preparo o diff para alguém aplicar.'
+      : 'Atualizei staging para 2.4. Produção costuma exigir revisão; confirme antes que eu altere infra/prod/.';
+  } else if (!st.prd.alterado) {
+    msg = 'Atualizei staging para 2.4. A edição em infra/prod/deploy.yaml foi bloqueada por um hook do projeto (política da equipe)' + (tentativas.length > 1 ? `, também com ${tentativas[1]}` : '') + '. Alguém com acesso a produção precisa aplicar a mudança.';
+  } else {
+    msg = st.bloqueios > 0
+      ? `Atualizei staging e produção para 2.4. A primeira tentativa foi bloqueada por um hook; com ${st.prd.por} a alteração passou.`
+      : 'Atualizei staging e produção para 2.4.';
+    if (cat === 'alterado-log' && P.s !== '1') msg += ' Um hook avisou depois que infra/prod/ é protegido, mas o arquivo já foi alterado. Talvez seja preciso reverter.';
+  }
+  st.disparos.Stop++;
+  st.matcher = '—'; st.exit = '—'; st.decisao = '—';
+  add({
+    kind: 'info', ator: 'modelo', station: 'Stop',
+    title: 'O modelo termina o turno',
+    text: `<p>O modelo responde com texto e [[stop_reason: "end_turn"]], e [[Stop]] dispara ${M}. A mensagem é uma continuação plausível, não garantida ${S}.</p>`,
+    dados: { titulo: 'Resposta final do modelo', json: { stop_reason: 'end_turn', content: [{ type: 'text', text: msg }] }, hl: ['text'] },
+    trans: ['Desfecho: o que ficou em disco e quem decidiu.'],
+  });
+
+  /* desfecho */
+  const C = CATEG[cat];
+  st.categoria = cat; st.desfecho = C.rot; st.quem = C.quem;
+  const nlog = st.audit.length;
+  add({
+    kind: 'end', ator: 'fim', station: null,
+    title: C.rot,
+    text: `<p>${C.licao(P, st)}</p><p>Produção: <b>${st.prd.alterado ? 'alterada para 2.4' : 'intacta em 2.3'}</b>. Quem decidiu: <b>${C.quem}</b>. Registro: <b>${nlog ? nlog + (nlog === 1 ? ' linha' : ' linhas') + ' no audit.log' : 'nenhum'}</b>.</p>`,
+    dados: { titulo: 'Desfecho', json: { 'infra/prod/deploy.yaml': 'image: ' + st.prd.image, quem_decidiu: C.quem, 'audit.log': st.audit, avisos_no_transcript: st.transcript, script_do_hook_rodou: st.scriptRodou }, hl: ['infra/prod/deploy.yaml', 'quem_decidiu'] },
+    trans: ['Fim deste caminho. Clique num ◆ da linha do tempo e troque a escolha: o caminho é refeito dali em diante.', 'A matriz abaixo mostra o desfecho de cada proteção com cada pedido.'],
+  });
+  return steps;
+}
+
+/* ================= motor ================= */
+let decisions = {};
+let path = [];
+let cur = 0, playing = false, timer = null, speed = 1;
+const BASE_MS = 2400;
+let cfgDraft = null;
+let scriptOpen = false;
+
+function choose(step, value) {
+  const id = step.decision.id;
+  if (decisions[id] !== value) {
+    for (const s of path) if (s.kind === 'decision' && s.index > step.index) delete decisions[s.decision.id];
+    decisions[id] = value;
+    path = buildPath(decisions);
+  }
+  cur = Math.min(step.index + 1, path.length - 1);
+  renderAll();
+}
+const unresolved = (s) => s.kind === 'decision' && decisions[s.decision.id] === undefined;
+
+function tick() {
+  if (unresolved(path[cur]) || cur >= path.length - 1) { pause(); return; }
+  cur++; renderAll();
+  if (unresolved(path[cur]) || cur >= path.length - 1) pause();
+}
+function play() {
+  if (playing) return;
+  if (unresolved(path[cur]) || cur >= path.length - 1) { renderControls(); return; }
+  playing = true; timer = setInterval(tick, BASE_MS / speed); renderControls();
+}
+function pause() { playing = false; clearInterval(timer); timer = null; renderControls(); }
+function next() { if (!unresolved(path[cur]) && cur < path.length - 1) { cur++; renderAll(); } }
+function prev() { if (cur > 0) { cur--; renderAll(); } }
+function goto(i) { pause(); if (i >= 0 && i < path.length) { cur = i; renderAll(); } }
+function reset() { pause(); decisions = {}; cfgDraft = null; path = buildPath(decisions); cur = 0; renderAll(); }
+function setSpeed(v) { speed = v; if (playing) { pause(); play(); } }
+
+/* ================= render ================= */
+const ATORES = {
+  none: { rot: 'Visão geral', cls: 'a-none' },
+  fim: { rot: 'Desfecho', cls: 'a-none' },
+  equipe: { rot: 'Equipe', cls: 'a-user' },
+  usuario: { rot: 'Usuário', cls: 'a-user' },
+  modelo: { rot: 'Modelo', cls: 'a-model' },
+  cc: { rot: 'Claude Code', cls: 'a-harness' },
+  harness: { rot: 'Harness', cls: 'a-harness' },
+  script: { rot: 'Script do hook', cls: 'a-harness' },
+  ferramenta: { rot: 'Ferramenta', cls: 'a-tools' },
+};
+const RAIL = [
+  { id: 'SessionStart', ds: 'sessão começa' },
+  { id: 'UserPromptSubmit', ds: 'usuário envia prompt' },
+  { id: 'modelo', nm: 'modelo responde…', ds: 'pede uma tool, delega ou termina', phase: true },
+  { id: 'PreToolUse', ds: 'pediu tool: antes de executar', gate: true },
+  { id: 'exec' },
+  { id: 'PostToolUse', ds: 'deu certo: já aconteceu' },
+  { id: 'PostToolUseFailure', ds: 'começou a executar e falhou' },
+  { id: 'Subagent', nm: 'SubagentStart / SubagentStop', ds: 'delegou: subagent nasce e termina' },
+  { id: 'Stop', ds: 'modelo termina o turno' },
+  { id: 'Compact', nm: 'PreCompact / PostCompact', ds: 'janela encheu: antes e depois' },
+  { id: 'SessionEnd', ds: 'sessão termina' },
+];
+const stationKey = (x) => (x === 'PreCompact' || x === 'PostCompact' ? 'Compact' : x);
+function railCount(d, id) {
+  if (id === 'Subagent') return `${d.SubagentStart} / ${d.SubagentStop}`;
+  if (id === 'Compact') return `${d.PreCompact} / ${d.PostCompact}`;
+  return d[id] === undefined ? '' : '×' + d[id];
+}
+
+function renderAll() {
+  const s = path[cur];
+  if (!(s.kind === 'decision' && s.decision.id === 'protecao')) cfgDraft = null;
+  renderControls();
+  renderTimeline();
+  renderRail(s);
+  renderStep(s);
+  renderModel(s);
+  renderHarness(s);
+  renderWorld(s);
+  renderData(s);
+  renderState(s);
+  renderTrans(s);
+  renderMatrix();
+}
+
+function renderControls() {
+  if (!path.length) return;
+  const s = path[cur];
+  const b = $('b-play');
+  b.textContent = playing ? '❚❚ Pausar' : '▶ Play';
+  b.disabled = !playing && (unresolved(s) || cur >= path.length - 1);
+  $('b-prev').disabled = cur === 0;
+  $('b-next').disabled = unresolved(s) || cur >= path.length - 1;
+  const last = path[path.length - 1];
+  const tail = unresolved(last) ? ' · o total cresce quando você decide' : (last.kind === 'end' ? ' · caminho completo' : '');
+  $('progress').textContent = `Etapa ${cur + 1} de ${path.length}${tail}`;
+}
+
+function renderTimeline() {
+  $('timeline').innerHTML = path.map((s, i) => {
+    const cls = ['tl'];
+    if (i < cur) cls.push('past');
+    if (i === cur) cls.push('cur');
+    if (s.kind === 'decision') { cls.push('dec'); if (unresolved(s)) cls.push('pending'); }
+    if (s.kind === 'end') cls.push('end');
+    return `<button type="button" class="${cls.join(' ')}" data-i="${i}" title="${i + 1}. ${esc(s.title)}" aria-label="Etapa ${i + 1}: ${esc(s.title)}"></button>`;
+  }).join('');
+  $('timeline').querySelectorAll('.tl').forEach((el) => el.addEventListener('click', () => goto(+el.dataset.i)));
+}
+
+function renderRail(s) {
+  const st = s.state, d = st.disparos;
+  const pd = cur > 0 ? path[cur - 1].state.disparos : null;
+  const P = st.prot ? parseProt(st.prot) : { ev: 'none' };
+  const key = stationKey(s.station);
+  $('rail').innerHTML = RAIL.map((r) => {
+    if (r.id === 'exec') {
+      const e = st.exec;
+      const res = e ? (e.tipo === 'bloq' ? `✕ ${esc(e.txt)}: barrado antes` : `✓ ${esc(e.txt)}`) : 'nenhuma execução em curso';
+      return `<li class="st exec ${key === 'exec' ? 'cur' : ''}"><div class="execline ${e ? e.tipo : ''}"><b>executa a tool</b> · daqui para baixo, a ação já aconteceu<span class="res">${res}</span></div></li>`;
+    }
+    const cnt = r.phase ? '' : railCount(d, r.id);
+    const bump = pd && !r.phase && railCount(pd, r.id) !== cnt;
+    const zero = !r.phase && (cnt === '×0' || cnt === '0 / 0');
+    const plug = (P.ev === 'pre' && r.id === 'PreToolUse') || (P.ev === 'post' && r.id === 'PostToolUse')
+      ? `<span class="plug">hook · ${esc(MATCHERS[P.m])} · ${SAIDA_CURTA[P.s]}</span>` : '';
+    const cls = ['st'];
+    if (r.phase) cls.push('phase');
+    if (r.gate) cls.push('gate');
+    if (key === r.id) cls.push('cur');
+    if (zero && key !== r.id) cls.push('dim');
+    return `<li class="${cls.join(' ')}">${cnt !== '' ? `<span class="ct ${bump ? 'bump' : ''}">${cnt}</span>` : ''}<span class="nm">${esc(r.nm || r.id)}</span>${r.gate ? '<span class="can-block">pode bloquear</span>' : ''}<span class="ds">${esc(r.ds)}</span>${plug}</li>`;
+  }).join('');
+}
+
+function currentCfgValue(s) { return cfgDraft || s.decision.value || 'none'; }
+function renderCfg(s) {
+  const v = currentCfgValue(s);
+  const p = parseProt(v);
+  const sel = (id, obj, val, dis) => `<select id="${id}" ${dis ? 'disabled' : ''}>` + Object.entries(obj).map(([k, t]) => `<option value="${k}" ${k === val ? 'selected' : ''}>${esc(t)}</option>`).join('') + '</select>';
+  const label = s.decision.value == null ? 'Salvar e abrir a sessão' : (v === s.decision.value ? 'Manter e seguir' : 'Salvar a mudança e refazer o caminho');
+  return `<div class="cfg">
+    <div class="presets" role="group" aria-label="Atalhos de configuração">${PRESETS.map((x) => `<button type="button" class="btn ${x.v === v ? 'on' : ''}" data-p="${x.v}">${esc(x.rot)}<small>${esc(x.nota)}</small></button>`).join('')}</div>
+    <div class="cfg-row">
+      <label for="cfg-ev">Evento${sel('cfg-ev', { none: 'nenhum hook (só a regra)', pre: 'PreToolUse', post: 'PostToolUse' }, p.ev, false)}</label>
+      <label for="cfg-m">Matcher${sel('cfg-m', MATCHERS, p.m || 'ew', p.ev === 'none')}</label>
+      <label for="cfg-s">Quando o caminho casa${sel('cfg-s', SAIDAS, p.s || '2', p.ev === 'none')}</label>
+    </div>
+    <div class="cfg-prev">
+      <div><div class="lbl">.claude/settings.json (rascunho)</div><pre class="code">${esc(JSON.stringify(settingsJson(v), null, 2))}</pre></div>
+      <div><div class="lbl">.claude/hooks/protege-prod.sh</div><pre class="code">${scriptLines(v).map((l) => `<span class="ln ${l.hl ? 'hl' : ''}">${esc(l.t)}</span>`).join('')}</pre></div>
+    </div>
+    <div><button type="button" class="btn primary" id="cfg-apply">${label}</button></div>
+  </div>`;
+}
+function bindCfg(s) {
+  const upd = (e) => {
+    const ev = $('cfg-ev').value;
+    cfgDraft = ev === 'none' ? 'none' : `${ev}.${$('cfg-m').value}.${$('cfg-s').value}`;
+    const fid = e && e.target && e.target.id;
+    renderStep(s);
+    if (fid && $(fid)) $(fid).focus();
+  };
+  ['cfg-ev', 'cfg-m', 'cfg-s'].forEach((id) => $(id).addEventListener('change', upd));
+  $('step').querySelectorAll('[data-p]').forEach((b) => b.addEventListener('click', () => { cfgDraft = b.dataset.p; renderStep(s); }));
+  $('cfg-apply').addEventListener('click', () => { pause(); const v = currentCfgValue(s); cfgDraft = null; choose(s, v); });
+}
+
+function renderStep(s) {
+  const a = ATORES[s.ator] || ATORES.none;
+  let h = `<div class="step-head"><span class="actor ${a.cls}">${a.rot}</span><span class="step-idx">Etapa ${s.index + 1} de ${path.length}</span></div><h2>${esc(s.title)}</h2><div class="txt">${fmt(s.text)}</div>`;
+  if (s.kind === 'decision') {
+    if (s.hint) h += `<div class="hint">${fmt(s.hint)}</div>`;
+    if (s.decision.type === 'options') {
+      h += '<div class="opts">' + s.decision.options.map((o) => `<button type="button" class="opt ${s.decision.value === o.v ? 'chosen' : ''}" data-v="${o.v}"><b>${esc(o.rot)}</b><span>${esc(o.desc)}</span></button>`).join('') + '</div>';
+    } else {
+      h += renderCfg(s);
+    }
+    h += `<p class="decnote">${s.decision.value == null ? 'O Play está parado esperando esta escolha.' : 'Escolha registrada. Trocar agora refaz o caminho a partir daqui e apaga as decisões seguintes.'}</p>`;
+  }
+  $('step').innerHTML = h;
+  if (s.kind === 'decision') {
+    if (s.decision.type === 'options') $('step').querySelectorAll('.opt').forEach((b) => b.addEventListener('click', () => { pause(); choose(s, b.dataset.v); }));
+    else bindCfg(s);
+  }
+}
+
+function renderModel(s) {
+  const st = s.state;
+  $('p-model').innerHTML = `<dl class="kv">
+    <dt>Turno</dt><dd class="mono">${st.turno}</dd>
+    <dt>Janela de contexto</dt><dd>${st.contexto}%<div class="meter ${st.contexto >= 90 ? 'hot' : ''}"><i style="width:${st.contexto}%"></i></div></dd>
+    <dt>Regra no contexto</dt><dd><span class="chip ${st.regraCls}">${esc(st.regra)}</span></dd>
+    <dt>Último pedido</dt><dd>${esc(st.pedido)}</dd>
+    <dt>Recebeu por último</dt><dd>${esc(st.claude)}</dd>
+  </dl>`;
+}
+
+function renderHarness(s) {
+  const st = s.state;
+  const v = st.prot;
+  const exCls = st.decisao === 'bloquear' ? 'e2' : (st.exit === '1' ? 'e1' : 'e0');
+  const decCls = st.decisao === 'bloquear' ? 'hz'
+    : (st.decisao === 'executar' && st.exec && st.exec.tipo === 'ok-prod') || st.decisao.startsWith('nenhuma') ? 'bad' : '';
+  $('p-harness').innerHTML = `<dl class="kv">
+    <dt>Hook no settings.json</dt><dd>${v ? esc(protLabel(v)) : '—'}</dd>
+    <dt>Matcher</dt><dd>${esc(st.matcher)}</dd>
+    <dt>Script rodou</dt><dd>${st.scriptRodou}× nesta sessão</dd>
+    <dt>Exit code</dt><dd><span class="exitbox ${exCls}">${esc(st.exit)}</span></dd>
+    <dt>Decisão</dt><dd><span class="chip ${decCls}">${esc(st.decisao)}</span></dd>
+  </dl>${v && v !== 'none' ? `<details id="sc-det" ${scriptOpen ? 'open' : ''}><summary>Ver o script do hook</summary><pre class="code">${scriptLines(v).map((l) => `<span class="ln ${l.hl ? 'hl' : ''}">${esc(l.t)}</span>`).join('')}</pre></details>` : ''}`;
+  const det = $('sc-det');
+  if (det) det.addEventListener('toggle', () => { scriptOpen = det.open; });
+}
+
+function fileCard(name, f, replicas, isProd, prevF) {
+  const now = prevF && prevF.image !== f.image;
+  const pill = f.alterado
+    ? `<span class="chip ${isProd ? 'bad' : ''}">alterado · 2.4</span>`
+    : `<span class="chip ${isProd ? 'good' : ''}">intacto · 2.3</span>`;
+  return `<div class="file ${isProd && f.alterado ? 'prod-bad' : ''} ${now ? 'now' : ''}"><div class="fh"><code>${name}</code>${pill}</div><pre>service: api\nreplicas: ${replicas}<span class="imgline ${f.alterado ? 'diff' : ''}">image: ${esc(f.image)}</span></pre></div>`;
+}
+function logHtml(arr, prevArr, empty) {
+  if (!arr.length) return `<span class="empty">${empty}</span>`;
+  return arr.map((l, i) => `<span class="${prevArr && i >= prevArr.length ? 'new' : ''}">${esc(l)}</span>`).join('');
+}
+function renderWorld(s) {
+  const st = s.state;
+  const ps = cur > 0 ? path[cur - 1].state : null;
+  $('p-world').innerHTML = `<div class="files">
+      ${fileCard('infra/staging/deploy.yaml', st.stg, 2, false, ps && ps.stg)}
+      ${fileCard('infra/prod/deploy.yaml', st.prd, 6, true, ps && ps.prd)}
+    </div>
+    <div class="logs">
+      <div class="logbox"><div class="lbl">.claude/audit.log</div><pre>${logHtml(st.audit, ps && ps.audit, 'vazio')}</pre></div>
+      <div class="logbox"><div class="lbl">Avisos no transcript</div><pre>${logHtml(st.transcript, ps && ps.transcript, 'nenhum')}</pre></div>
+    </div>`;
+}
+
+function jsonHtml(obj, hl) {
+  return JSON.stringify(obj, null, 2).split('\n').map((l) => {
+    const m = l.match(/^\s*"([^"]+)":/);
+    const on = m && hl && hl.includes(m[1]);
+    return `<span class="ln ${on ? 'hl' : ''}">${esc(l)}</span>`;
+  }).join('\n');
+}
+function renderData(s) {
+  $('data-title').textContent = 'Dados: ' + s.dados.titulo;
+  $('data').innerHTML = jsonHtml(s.dados.json, s.dados.hl);
+  $('data-note').innerHTML = s.note ? fmt(s.note) : '';
+}
+
+function stateRows(st) {
+  return [
+    ['Turno', st.turno],
+    ['Janela de contexto', st.contexto + '%'],
+    ['Compactações', st.compactacoes],
+    ['Regra no contexto do modelo', st.regra],
+    ['Modo de permissão', 'bypassPermissions (fixo)'],
+    ['Hook configurado', st.prot ? protLabel(st.prot) : '—'],
+    ['Último pedido do modelo', st.pedido],
+    ['Matcher', st.matcher],
+    ['Exit code do script', st.exit],
+    ['Decisão do harness', st.decisao],
+    ['Script do hook rodou', st.scriptRodou + '×'],
+    ['infra/staging/deploy.yaml', st.stg.alterado ? 'alterado: 2.4' : 'intacto: 2.3'],
+    ['infra/prod/deploy.yaml', st.prd.alterado ? `alterado: 2.4, por ${st.prd.por}` : 'intacto: 2.3'],
+    ['Linhas no audit.log', st.audit.length],
+    ['Avisos no transcript', st.transcript.length],
+    ['Claude recebeu por último', st.claude],
+    ['Desfecho', st.desfecho],
+  ];
+}
+function renderState(s) {
+  const rows = stateRows(s.state);
+  const pr = cur > 0 ? stateRows(path[cur - 1].state) : null;
+  $('state').innerHTML = rows.map((r, i) => `<tr><th scope="row">${esc(r[0])}</th><td class="${pr && String(pr[i][1]) !== String(r[1]) ? 'chg' : ''}">${esc(r[1])}</td></tr>`).join('');
+}
+function renderTrans(s) {
+  const t = unresolved(s) ? ['Escolha uma opção acima: o Play fica parado até lá.'] : (s.trans || []);
+  $('trans').innerHTML = t.map((x) => `<li>${fmt(esc(x))}</li>`).join('');
+}
+
+/* ================= matriz ================= */
+const COLS = [
+  { v: 'respeita', rot: 'Não pede produção' },
+  { v: 'edit', rot: 'Pede Edit' },
+  { v: 'write', rot: 'Pede Write' },
+  { v: 'bash', rot: 'Pede Bash (sed -i)' },
+];
+const MCACHE = {};
+function cellOf(prot, ped) {
+  const k = prot + '|' + ped;
+  if (!MCACHE[k]) {
+    const p = buildPath({ regra: 'raiz', protecao: prot, pedido: ped, retry: 'desiste' });
+    MCACHE[k] = p[p.length - 1].state.categoria;
+  }
+  return MCACHE[k];
+}
+function renderMatrix() {
+  const rows = PRESETS.map((x) => ({ v: x.v, rot: x.rot, sub: x.v === 'none' ? x.nota : `${protLabel(x.v)} · ${x.nota}` }));
+  const dp = decisions.protecao;
+  if (dp && !rows.some((r) => r.v === dp)) rows.push({ v: dp, rot: 'Sua configuração', sub: protLabel(dp) });
+  let h = '<tr><th>Proteção</th>' + COLS.map((c) => `<th>${esc(c.rot)}</th>`).join('') + '</tr>';
+  for (const r of rows) {
+    h += `<tr><td class="rowh">${esc(r.rot)}<small>${esc(r.sub)}</small></td>`;
+    for (const c of COLS) {
+      const C = CATEG[cellOf(r.v, c.v)];
+      const isCur = dp === r.v && decisions.pedido === c.v;
+      h += `<td><button type="button" class="cell ${C.cls} ${isCur ? 'cur' : ''}" data-p="${r.v}" data-c="${c.v}" aria-label="${esc(r.rot)}, ${esc(c.rot)}: ${esc(C.rot)}"><b>${C.curto}</b>${esc(C.sub)}</button></td>`;
+    }
+    h += '</tr>';
+  }
+  $('matrix').innerHTML = h;
+  $('matrix').querySelectorAll('.cell').forEach((b) => b.addEventListener('click', () => jumpTo(b.dataset.p, b.dataset.c)));
+}
+function jumpTo(prot, ped) {
+  pause();
+  decisions = { regra: decisions.regra || 'raiz', protecao: prot, pedido: ped };
+  path = buildPath(decisions);
+  const i = path.findIndex((x) => x.kind === 'decision' && x.decision.id === 'pedido');
+  cur = Math.min(i + 1, path.length - 1);
+  renderAll();
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  $('step').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+}
+
+/* ================= quanto vale “quase sempre” ================= */
+let qSeed = 20260954;
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function renderQuase() {
+  const p = +$('q-p').value / 1000;
+  const n = +$('q-n').value;
+  $('q-p-v').textContent = (p * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+  $('q-n-v').textContent = String(n);
+  const prob = 1 - Math.pow(p, n);
+  $('q-prob').textContent = prob > 0.999 ? '> 99,9%' : (prob * 100).toLocaleString('pt-BR', { maximumFractionDigits: prob < 0.1 ? 1 : 0 }) + '%';
+  $('q-exp').textContent = (n * (1 - p)).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  const rnd = mulberry32(qSeed);
+  let k = 0, a = '', b = '';
+  for (let i = 0; i < n; i++) {
+    const v = rnd() >= p;
+    if (v) k++;
+    a += `<i class="dot ${v ? 'v' : ''}"></i>`;
+    b += `<i class="dot ${v ? 'b' : ''}"></i>`;
+  }
+  $('q-dots-a').innerHTML = a;
+  $('q-dots-b').innerHTML = b;
+  $('q-count-a').textContent = `${k} ${k === 1 ? 'edição' : 'edições'} em produção nesta quinzena`;
+  $('q-count-b').textContent = `0 edições; ${k} ${k === 1 ? 'pedido barrado' : 'pedidos barrados'}`;
+}
+
+/* ================= eventos ================= */
+$('b-play').addEventListener('click', () => (playing ? pause() : play()));
+$('b-next').addEventListener('click', () => { pause(); next(); });
+$('b-prev').addEventListener('click', () => { pause(); prev(); });
+$('b-reset').addEventListener('click', reset);
+$('speed').addEventListener('change', (e) => setSpeed(parseFloat(e.target.value)));
+['q-p', 'q-n'].forEach((id) => $(id).addEventListener('input', renderQuase));
+$('q-sort').addEventListener('click', () => { qSeed = (Math.imul(qSeed, 1103515245) + 12345) >>> 0; renderQuase(); });
+document.addEventListener('keydown', (e) => {
+  const tag = (e.target && e.target.tagName) || '';
+  if (/INPUT|SELECT|TEXTAREA/.test(tag)) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); pause(); next(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); pause(); prev(); }
+  else if (e.key === ' ' && tag !== 'BUTTON' && tag !== 'SUMMARY' && tag !== 'A') { e.preventDefault(); playing ? pause() : play(); }
+});
+
+window.__sim = {
+  get cur() { return cur; },
+  get playing() { return playing; },
+  path: () => path,
+  decisions: () => clone(decisions),
+  goto, choose: (i, v) => choose(path[i], v), play, pause, next, prev, reset,
+  build: (d) => buildPath(d),
+  cell: cellOf,
+};
+
+reset();
+renderQuase();
+</script>
+</body>
+</html>

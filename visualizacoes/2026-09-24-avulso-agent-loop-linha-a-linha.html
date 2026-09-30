@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent loop linha a linha</title>
+<meta name="description" content="Depurador interativo do pseudocódigo do agent loop: ajuste o código, faça o papel do modelo e veja cada linha mudar messages, stop_reason e a saída.">
+<style>
+  :root {
+    --ground:  #F6F7F9;
+    --surface: #FFFFFF;
+    --ink:     #15181D;
+    --muted:   #5C6470;
+    --faint:   #A7AEB8;
+    --rule:    #DFE3E9;
+    --accent:  #0F5C57;
+    --code-bg: #EFF1F4;
+    --err:     #B42318;
+    --err-bg:  #FDECEA;
+    --good:    #15803D;
+    --good-bg: #E7F6EC;
+    --warn:    #A15C07;
+    --cli:     #A21C5B;
+    --app:     #0F5C57;
+    --model:   #5B3FBF;
+    --tools:   #92400E;
+    --mat:     #1D4ED8;
+    --doc:     #047857;
+    --sim:     #C2410C;
+    --on-fill: #FFFFFF;
+    --hl:      rgba(15, 92, 87, .16);
+    --hl-line: rgba(15, 92, 87, .08);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #101317;
+      --surface: #171B21;
+      --ink:     #E6E9EE;
+      --muted:   #98A2B0;
+      --faint:   #4A525E;
+      --rule:    #2A313B;
+      --accent:  #4FB3A6;
+      --code-bg: #1E242C;
+      --err:     #F87171;
+      --err-bg:  #3A1D1F;
+      --good:    #4ADE80;
+      --good-bg: #16301F;
+      --warn:    #FBBF24;
+      --cli:     #F472B6;
+      --app:     #4FB3A6;
+      --model:   #A78BFA;
+      --tools:   #F0A34D;
+      --mat:     #7FA6FF;
+      --doc:     #4ADE80;
+      --sim:     #FB923C;
+      --on-fill: #101317;
+      --hl:      rgba(79, 179, 166, .26);
+      --hl-line: rgba(79, 179, 166, .10);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:  #101317;
+    --surface: #171B21;
+    --ink:     #E6E9EE;
+    --muted:   #98A2B0;
+    --faint:   #4A525E;
+    --rule:    #2A313B;
+    --accent:  #4FB3A6;
+    --code-bg: #1E242C;
+    --err:     #F87171;
+    --err-bg:  #3A1D1F;
+    --good:    #4ADE80;
+    --good-bg: #16301F;
+    --warn:    #FBBF24;
+    --cli:     #F472B6;
+    --app:     #4FB3A6;
+    --model:   #A78BFA;
+    --tools:   #F0A34D;
+    --mat:     #7FA6FF;
+    --doc:     #4ADE80;
+    --sim:     #FB923C;
+    --on-fill: #101317;
+    --hl:      rgba(79, 179, 166, .26);
+    --hl-line: rgba(79, 179, 166, .10);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; padding: 16px;
+    background: var(--ground); color: var(--ink);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  code, pre, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, "Courier New", monospace; }
+  code { font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .panel, .warnbox, .sub, .legend, footer, td, th, li, p { overflow-wrap: anywhere; min-width: 0; }
+  h1 { font-size: 1.45rem; line-height: 1.25; margin: 0 0 6px; }
+  h2 { font-size: 1.05rem; margin: 0 0 8px; }
+  h3 { font-size: .95rem; margin: 14px 0 6px; }
+  p { margin: 0 0 10px; }
+  ul, ol { margin: 0 0 10px; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1320px; margin: 0 auto; }
+  .sub { color: var(--muted); margin-bottom: 10px; }
+  .warnbox { border: 1px dashed var(--sim); border-radius: 8px; padding: 8px 12px; font-size: .9rem; margin: 8px 0 12px; background: var(--surface); }
+
+  .tag { display: inline-block; font-size: .68rem; line-height: 1.4; padding: 0 7px; border-radius: 999px; border: 1px solid; margin-left: 4px; vertical-align: middle; white-space: nowrap; font-family: system-ui, sans-serif; font-weight: 600; text-decoration: none; }
+  .t-mat { color: var(--mat); border-color: var(--mat); }
+  .t-doc { color: var(--doc); border-color: var(--doc); }
+  a.t-doc:hover { background: var(--hl-line); }
+  .t-sim { color: var(--sim); border-color: var(--sim); border-style: dashed; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: .85rem; color: var(--muted); align-items: center; }
+  .legend .tag { margin-left: 0; }
+
+  .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; }
+
+  /* ajustes do código */
+  .cfg { margin: 14px 0 0; }
+  .cfg-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 14px; align-items: center; }
+  @media (max-width: 680px) { .cfg-grid { grid-template-columns: minmax(0, 1fr); gap: 4px; } .cfg-l { margin-top: 6px; } }
+  .cfg-l { font-size: .85rem; color: var(--muted); font-weight: 600; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button, .presets button { font: inherit; font-size: .84rem; padding: 5px 11px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; text-align: left; }
+  .seg button:hover, .presets button:hover { border-color: var(--accent); }
+  .seg button[aria-pressed="true"] { border-color: var(--accent); background: var(--hl); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent); }
+  .seg button small { color: var(--muted); font-weight: 400; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .presets button { border-style: dashed; border-color: var(--sim); }
+  .cfg-note { font-size: .84rem; margin: 10px 0 0; min-height: 1.3em; color: var(--accent); font-weight: 600; }
+
+  /* controles */
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 10px; }
+  .btn { font: inherit; font-size: .9rem; padding: 7px 13px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .btn:hover:not(:disabled) { border-color: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.primary { background: var(--accent); color: var(--on-fill); border-color: var(--accent); font-weight: 600; min-width: 104px; }
+  .controls select { font: inherit; font-size: .9rem; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); }
+  .progress { font-size: .88rem; color: var(--muted); margin-left: auto; }
+  .kbd { font-size: .78rem; color: var(--muted); margin: 0 0 12px; }
+  .timeline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
+  .tl { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--rule); background: var(--surface); cursor: pointer; padding: 0; }
+  .tl.past { background: var(--rule); }
+  .tl.cur { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 3px var(--hl); }
+  .tl.dec { border-radius: 4px; transform: rotate(45deg); border-color: var(--sim); }
+  .tl.dec.open { border-style: dashed; }
+  .tl.dec.past, .tl.dec.cur { background: var(--sim); border-color: var(--sim); }
+  .tl.end { border-radius: 3px; }
+  .tl.end.fail { border-color: var(--err); }
+  .tl.end.ok { border-color: var(--good); }
+  .tl-more { font-size: .8rem; color: var(--sim); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .85rem; color: var(--muted); margin-bottom: 4px; }
+  .chip-dec { font: inherit; font-size: .8rem; padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--sim); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .chip-dec b { color: var(--sim); }
+
+  /* grade */
+  .grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  @media (max-width: 1000px) {
+    .grid { display: flex; flex-direction: column; align-items: stretch; gap: 14px; }
+    .col { display: contents; }
+    #p-step { order: 1; } #p-code { order: 2; } #p-state { order: 3; } #p-data { order: 4; }
+    #p-voltas { order: 5; } #p-log { order: 6; } #p-out { order: 7; } #p-trans { order: 8; }
+  }
+
+  /* código (palco) */
+  ol.code { list-style: none; margin: 0; padding: 8px 0; background: var(--code-bg); border-radius: 8px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .8rem; line-height: 1.5; }
+  ol.code li { display: grid; grid-template-columns: 34px 16px 30px minmax(0, 1fr); align-items: start; margin: 0; padding: 3px 10px 3px 0; cursor: pointer; border-left: 4px solid transparent; }
+  ol.code li:hover { background: var(--hl-line); }
+  ol.code li:focus-visible { outline: 2px solid var(--mat); outline-offset: -2px; }
+  ol.code li.adj { border-left-color: var(--accent); }
+  ol.code li.bug { border-left-color: var(--err); }
+  ol.code li.cur { background: var(--hl); }
+  ol.code li.cur .src { font-weight: 700; }
+  ol.code li.never .src { opacity: .55; }
+  @media (max-width: 680px) {
+    ol.code { font-size: .76rem; }
+    ol.code li { grid-template-columns: 26px 12px 22px minmax(0, 1fr); padding-right: 6px; }
+    .src { padding-left: calc(var(--i, 0) * .9em); }
+  }
+  .cnt { font-size: .68rem; text-align: center; color: var(--faint); padding-top: 2px; font-family: system-ui, sans-serif; }
+  .cnt.on { color: var(--accent); font-weight: 700; }
+  .arr { color: var(--accent); font-weight: 700; }
+  .cno { color: var(--faint); text-align: right; padding-right: 8px; white-space: nowrap; }
+  .src { white-space: pre-wrap; word-break: break-word; padding-left: calc(var(--i, 0) * 1.3em); }
+  .src .kw { font-weight: 700; color: var(--model); }
+  .src .cm { color: var(--muted); font-style: italic; }
+  .src .st { color: var(--tools); }
+  .src .badge { font-family: system-ui, sans-serif; font-size: .66rem; font-weight: 700; border-radius: 999px; padding: 0 6px; margin-left: 6px; border: 1px solid; font-style: normal; }
+  .src .badge.adj { color: var(--accent); border-color: var(--accent); }
+  .src .badge.bug { color: var(--err); border-color: var(--err); }
+  .code-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .78rem; color: var(--muted); margin: 8px 0 0; }
+  .code-hint { font-size: .84rem; margin: 8px 0 0; padding: 6px 10px; border-left: 3px solid var(--accent); background: var(--hl-line); border-radius: 4px; }
+  .stage-why { font-size: .82rem; color: var(--muted); margin: 8px 0 0; }
+
+  /* voltas */
+  .voltas { display: flex; flex-wrap: wrap; gap: 8px; }
+  .vc { border: 1px solid var(--rule); border-radius: 8px; padding: 6px 9px; min-width: 120px; flex: 1 1 130px; font-size: .8rem; background: var(--surface); }
+  .vc.new { box-shadow: 0 0 0 2px var(--accent); }
+  .vc .vh { font-weight: 700; font-size: .78rem; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
+  .sr { display: inline-block; font-family: ui-monospace, Consolas, monospace; font-size: .74rem; font-weight: 700; padding: 0 6px; border-radius: 4px; margin: 3px 0; }
+  .sr.tool_use { background: var(--hl); color: var(--accent); }
+  .sr.end_turn { background: var(--good-bg); color: var(--good); }
+  .sr.max_tokens, .sr.refusal, .sr.http_400 { background: var(--err-bg); color: var(--err); }
+  .sr.wait { background: var(--code-bg); color: var(--muted); }
+  .vc .tl2 { font-family: ui-monospace, Consolas, monospace; font-size: .72rem; color: var(--muted); word-break: break-word; }
+  .vc .den { color: var(--err); font-weight: 700; }
+  .limit-bar { display: flex; gap: 4px; margin: 8px 0 0; align-items: center; font-size: .8rem; color: var(--muted); flex-wrap: wrap; }
+  .limit-bar i { width: 26px; height: 10px; border-radius: 3px; border: 1px solid var(--rule); background: var(--surface); display: inline-block; }
+  .limit-bar i.on { background: var(--accent); border-color: var(--accent); }
+  .limit-bar i.over { background: var(--err); border-color: var(--err); }
+
+  /* etapa */
+  .stephead { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+  .stepno { font-weight: 600; }
+  .actor { padding: 1px 9px; border-radius: 999px; color: var(--on-fill); font-weight: 600; font-size: .75rem; }
+  .a-cli { background: var(--cli); } .a-app { background: var(--app); } .a-api { background: var(--model); } .a-tools { background: var(--tools); }
+  .a-voce { background: var(--sim); } .a-none { background: var(--muted); }
+  .flag-dec { color: var(--sim); font-weight: 700; }
+  .flag-ok { color: var(--good); font-weight: 700; } .flag-fail { color: var(--err); font-weight: 700; }
+  .pcline { font-family: ui-monospace, Consolas, monospace; font-size: .78rem; color: var(--accent); }
+  .explain p { margin-bottom: 8px; }
+  .explain .note { font-size: .88rem; color: var(--muted); }
+  .decision { border: 1px dashed var(--sim); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .dprompt { font-weight: 600; margin-bottom: 8px; }
+  .dopts { display: flex; flex-direction: column; gap: 6px; }
+  .opt { font: inherit; text-align: left; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .opt small { display: block; color: var(--muted); font-size: .8rem; }
+  .opt:hover { border-color: var(--sim); }
+  .opt.sel { border-color: var(--sim); background: var(--hl-line); box-shadow: inset 0 0 0 1px var(--sim); }
+  .opt.sel::before { content: "✓ "; color: var(--sim); font-weight: 700; }
+  .opt code { font-size: .85em; }
+  .dwait { color: var(--sim); font-size: .88rem; margin: 8px 0 0; font-weight: 600; }
+  .dok { color: var(--muted); font-size: .85rem; margin: 8px 0 0; }
+  .verdict { margin-top: 10px; border-radius: 8px; padding: 10px 12px; font-size: .92rem; }
+  .verdict.ok { background: var(--good-bg); border: 1px solid var(--good); }
+  .verdict.fail { background: var(--err-bg); border: 1px solid var(--err); }
+  .verdict b.h { display: block; margin-bottom: 2px; }
+  .verdict.ok b.h { color: var(--good); } .verdict.fail b.h { color: var(--err); }
+
+  /* dados */
+  .data-title { font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+  pre.json { background: var(--code-bg); padding: 10px 0; border-radius: 8px; overflow: auto; font-size: .76rem; line-height: 1.5; max-height: 440px; margin: 0; }
+  pre.json .jl { display: block; white-space: pre-wrap; word-break: break-word; padding: 0 12px; }
+  pre.json .jl.hl { background: var(--hl); box-shadow: inset 3px 0 0 var(--accent); }
+  pre.json .k { color: var(--ink); font-weight: 600; }
+  pre.json .s { color: var(--model); }
+  pre.json .n { color: var(--tools); }
+  .data-cap { font-size: .8rem; color: var(--muted); margin: 6px 0 0; }
+
+  /* estado */
+  table.state { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  table.state th, table.state td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  table.state th { color: var(--muted); font-weight: 500; width: 46%; }
+  table.state th code { font-size: .82em; }
+  table.state td.chg { background: var(--hl-line); box-shadow: inset 3px 0 0 var(--accent); }
+  .idl { display: inline-block; font-family: ui-monospace, Consolas, monospace; font-size: .76rem; padding: 0 6px; border-radius: 4px; background: var(--code-bg); margin: 1px 3px 1px 0; }
+  .none { color: var(--muted); font-style: italic; }
+  .bool-t { color: var(--good); font-weight: 700; font-family: ui-monospace, Consolas, monospace; }
+  .bool-f { color: var(--err); font-weight: 700; font-family: ui-monospace, Consolas, monospace; }
+  .hist-t { font-size: .85rem; color: var(--muted); margin: 12px 0 4px; }
+  .msg { border: 1px solid var(--rule); border-left-width: 5px; border-radius: 6px; padding: 5px 9px; margin: 5px 0; background: var(--surface); }
+  .msg.user { border-left-color: var(--app); } .msg.assistant { border-left-color: var(--model); }
+  .msg.new { box-shadow: 0 0 0 2px var(--accent); }
+  .msg .role { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 3px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .msg.user .role { color: var(--app); } .msg.assistant .role { color: var(--model); }
+  .msg .role .idx, .msg .role .nw { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
+  .msg .role .nw { color: var(--accent); font-weight: 700; }
+  .blk { font-family: ui-monospace, Consolas, monospace; font-size: .73rem; margin: 2px 0; padding: 3px 7px; background: var(--code-bg); border-radius: 4px; word-break: break-word; }
+  .blk .bt { color: var(--muted); }
+  .blk.err { border: 1px dashed var(--err); }
+
+  /* log e saída */
+  .log { font-family: ui-monospace, Consolas, monospace; font-size: .74rem; background: var(--code-bg); border-radius: 8px; padding: 8px 10px; max-height: 240px; overflow: auto; }
+  .log div { padding: 1px 0; word-break: break-word; }
+  .log .new { background: var(--hl); }
+  .log .deny { color: var(--err); } .log .warn { color: var(--warn); } .log .ok { color: var(--good); }
+  .chat { background: var(--code-bg); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .bub { max-width: 90%; padding: 6px 10px; border-radius: 12px; font-size: .88rem; line-height: 1.4; }
+  .bub.cli { align-self: flex-end; background: var(--cli); color: var(--on-fill); border-bottom-right-radius: 3px; }
+  .bub.app { align-self: flex-start; background: var(--surface); border: 1px solid var(--rule); border-bottom-left-radius: 3px; }
+  .bub.app.bad { border-color: var(--err); }
+  .bub .who { display: block; font-size: .7rem; font-weight: 700; opacity: .8; margin-bottom: 1px; }
+  .bub.sys { align-self: center; background: transparent; color: var(--muted); font-style: italic; font-size: .8rem; text-align: center; }
+  .bub.sys.err { color: var(--err); }
+  .typing { align-self: flex-start; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 6px 12px; font-size: .8rem; color: var(--muted); }
+  .typing i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); margin: 0 1px; animation: blink 1.2s infinite; }
+  .typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .typing i { animation: none; opacity: .6; } }
+  .cut { color: var(--err); font-weight: 700; }
+
+  ul.trans { list-style: none; padding: 0; margin: 0; }
+  ul.trans li { padding: 5px 0 5px 22px; position: relative; font-size: .9rem; border-bottom: 1px solid var(--rule); margin: 0; }
+  ul.trans li:last-child { border-bottom: 0; }
+  ul.trans li::before { content: "→"; position: absolute; left: 2px; color: var(--accent); font-weight: 700; }
+
+  /* referência */
+  .ref { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 1000px) { .ref { grid-template-columns: 1fr; } }
+  table.ref-t { width: 100%; border-collapse: collapse; font-size: .84rem; margin-bottom: 8px; }
+  table.ref-t th, table.ref-t td { text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  table.ref-t th { color: var(--muted); font-weight: 600; }
+  .tbl-wrap { overflow-x: auto; }
+  footer { color: var(--muted); font-size: .82rem; margin: 18px 0 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Agent loop, linha a linha</h1>
+  <p class="sub">Um depurador do pseudocódigo do material. A seta ▶ marca a linha que está rodando, as variáveis mudam ao lado e o contador em cada linha mostra quantas vezes ela já executou. Você mexe em duas coisas: no <b>seu código</b> (ajustes abaixo) e no <b>modelo</b> (a cada resposta, você escolhe o <code>stop_reason</code>). Origem: conteúdo colado na invocação. Simuladores irmãos: <a href="./2026-09-24-00-fundamentos-ciclo-tool-use.html">ciclo tool_use</a> (protocolo) e <a href="./2026-09-24-avulso-proxima-acao-apos-tool-use.html">próxima ação após tool_use</a> (decisão).</p>
+  <div class="warnbox">🧪 <b>Esta simulação não faz chamadas reais.</b> O cenário, os ids (<code>toolu_01PED</code>…), os textos do modelo e os resultados das ferramentas são inventados. O comportamento do modelo é você quem escolhe. Cada afirmação traz a origem:</div>
+  <div class="legend">
+    <span><span class="tag t-mat">material</span> está no conteúdo colado (pseudocódigo e leitura linha a linha)</span>
+    <span><span class="tag t-doc">doc oficial</span> conferido em platform.claude.com em 2026-09-24 (o selo é um link)</span>
+    <span><span class="tag t-sim">simulação</span> hipótese do exemplo, não é comportamento garantido</span>
+  </div>
+</header>
+
+<section class="panel cfg" aria-label="Ajustes do código e roteiros do modelo">
+  <h2>Ajustes do seu código</h2>
+  <div class="cfg-grid">
+    <span class="cfg-l">O que a linha 4 grava</span>
+    <div class="seg" data-k="grava">
+      <button type="button" data-v="content">response.content inteiro <small>(material)</small></button>
+      <button type="button" data-v="texto">só o texto <small>(o erro que o material aponta)</small></button>
+    </div>
+    <span class="cfg-l">Quando não é tool_use</span>
+    <div class="seg" data-k="parada">
+      <button type="button" data-v="material">senão: pare <small>(como no material)</small></button>
+      <button type="button" data-v="trata">trata max_tokens e refusal <small>(implementação real)</small></button>
+    </div>
+    <span class="cfg-l">Limite de voltas</span>
+    <div class="seg" data-k="limite">
+      <button type="button" data-v="nenhum">nenhum <small>(como no material)</small></button>
+      <button type="button" data-v="max3">MAX = 3</button>
+    </div>
+    <span class="cfg-l">Roteiros prontos do modelo</span>
+    <div class="presets" id="presets"></div>
+  </div>
+  <p class="cfg-note" id="cfg-note" aria-live="polite"></p>
+</section>
+
+<section class="controls" aria-label="Controles da simulação">
+  <button class="btn primary" id="btn-play" type="button">▶ Play</button>
+  <button class="btn" id="btn-prev" type="button">◀ Etapa anterior</button>
+  <button class="btn" id="btn-next" type="button">Próxima etapa ▶</button>
+  <button class="btn" id="btn-reset" type="button">↺ Reiniciar</button>
+  <label>Velocidade
+    <select id="speed" aria-label="Velocidade">
+      <option value="0.5">0,5×</option>
+      <option value="1" selected>1×</option>
+      <option value="2">2×</option>
+      <option value="4">4×</option>
+    </select>
+  </label>
+  <span class="progress" id="progress" aria-live="polite"></span>
+</section>
+<div class="timeline" id="timeline" aria-label="Linha do tempo das etapas"></div>
+<div class="chips" id="chips"></div>
+<p class="kbd">Atalhos: ← → mudam de etapa · espaço = Play/Pausar · ◆ = decisão (clique para voltar e trocar; o que vinha depois é descartado). Reiniciar zera as decisões e mantém os ajustes do código.</p>
+
+<main class="grid">
+  <div class="col">
+    <section class="panel" id="p-code">
+      <h2>Palco: o pseudocódigo rodando</h2>
+      <ol class="code" id="code" aria-label="Pseudocódigo do agent loop"></ol>
+      <div class="code-legend"><span>▶ linha em execução</span><span>nº à esquerda = vezes que a linha já rodou</span><span style="color:var(--accent)">▎ linha acrescentada por um ajuste</span><span style="color:var(--err)">▎ linha com o erro</span></div>
+      <p class="code-hint" id="code-hint"></p>
+      <p class="stage-why">Representação: <b>depurador passo a passo sobre o próprio pseudocódigo</b>. O material é um programa e pede leitura “linha a linha”, então a pergunta a responder é o que cada linha faz com o estado. Os simuladores irmãos usaram diagrama de sequência (protocolo) e máquina de estados (decisão); aqui o objeto é o laço como código.</p>
+    </section>
+    <section class="panel" id="p-voltas">
+      <h2>Voltas do laço</h2>
+      <div id="voltas"></div>
+    </section>
+    <section class="panel" id="p-out">
+      <h2>O que o cliente vê</h2>
+      <div id="out"></div>
+    </section>
+  </div>
+  <div class="col">
+    <section class="panel" id="p-step"></section>
+    <section class="panel" id="p-state">
+      <h2>Variáveis</h2>
+      <div id="state"></div>
+    </section>
+    <section class="panel" id="p-data">
+      <h2>Dados desta etapa</h2>
+      <div id="data"></div>
+    </section>
+    <section class="panel" id="p-log">
+      <h2>Log da aplicação</h2>
+      <div id="log"></div>
+    </section>
+    <section class="panel" id="p-trans">
+      <h2>O que pode acontecer a partir daqui</h2>
+      <div id="trans"></div>
+    </section>
+  </div>
+</main>
+
+<section class="ref">
+  <div class="panel">
+    <h2>Referência técnica breve</h2>
+    <h3>Cada linha, a regra e a fonte</h3>
+    <div class="tbl-wrap"><table class="ref-t">
+      <tr><th>Linha</th><th>Regra</th><th>Fonte</th></tr>
+      <tr><td><code>messages = [pergunta]</code></td><td>A API é stateless: tudo o que o modelo sabe vem desta lista, reenviada inteira a cada volta.</td><td><a class="tag t-doc" href="https://platform.claude.com/docs/en/build-with-claude/working-with-messages" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td><code>messages += response.content</code></td><td>Grava o turno do assistant inteiro, com os <code>tool_use</code>. Quem grava só o texto quebra o elo do <code>tool_use_id</code>. No código da doc: <code>messages.append({"role": "assistant", "content": response.content})</code>.</td><td><span class="tag t-mat">material</span> <a class="tag t-doc" href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td><code>se stop_reason == "tool_use"</code></td><td>É a condição do laço: sinal de controle, não campo informativo. O loop canônico repete enquanto o <code>stop_reason</code> for <code>"tool_use"</code>.</td><td><span class="tag t-mat">material</span> <a class="tag t-doc" href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td><code>executar(...)</code></td><td>O código é seu: “The model never executes anything on its own.” Cada volta passa por ele, e é a chance de validar, negar e logar. Para aprovação humana, log próprio ou execução condicional, a doc indica o loop manual em vez do Tool Runner.</td><td><span class="tag t-mat">material</span> <a class="tag t-doc" href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-runner" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td><code>messages += tool_result(...)</code></td><td>Um <code>tool_result</code> por <code>tool_use</code>, com <code>tool_use_id</code> = <code>bloco.id</code>, todos na mesma mensagem <code>user</code>. Um pedido negado também recebe resposta, com <code>is_error: true</code>.</td><td><a class="tag t-doc" href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td><code>senão: pare</code></td><td>O loop sai com qualquer outro <code>stop_reason</code> (<code>end_turn</code>, <code>max_tokens</code>, <code>stop_sequence</code>, <code>refusal</code>): ou Claude terminou, ou parou por um motivo que a sua aplicação precisa tratar.</td><td><a class="tag t-doc" href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td><code>max_tokens</code></td><td>Bateu no teto: aumente <code>max_tokens</code> ou continue a resposta.</td><td><a class="tag t-doc" href="https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td><code>refusal</code></td><td>Resposta normal, não erro. Vem com <code>stop_details</code> (<code>category</code> e <code>explanation</code> podem ser <code>null</code>); qualquer saída parcial é descartada. Decida pelo <code>stop_reason</code>, não pelo <code>content</code>.</td><td><a class="tag t-doc" href="https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td>limite de voltas</td><td>“Um agente que nunca para é um incidente à espera.” As páginas de tool use consultadas não prescrevem um limite; a recomendação vem do material.</td><td><span class="tag t-mat">material</span></td></tr>
+    </table></div>
+  </div>
+  <div class="panel">
+    <h2>Erros de interpretação frequentes</h2>
+    <ul>
+      <li><b>“<code>stop_reason</code> é um campo informativo.”</b> É a condição do laço. A linha 5 decide, a cada volta, se o agente continua <span class="tag t-mat">material</span>.</li>
+      <li><b>“Quem decide quantas voltas é o meu código.”</b> Quem decide é o modelo, pelo <code>stop_reason</code> de cada resposta. O seu código só consegue pôr um teto <span class="tag t-mat">material</span>.</li>
+      <li><b>“Gravar só o texto funciona, testei.”</b> Funciona enquanto não houver <code>tool_use</code>. O erro aparece uma volta depois, na requisição seguinte, e aqui dá para ver isso acontecer <span class="tag t-sim">simulação</span>.</li>
+      <li><b>“<code>senão</code> quer dizer <code>end_turn</code>.”</b> O <code>senão</code> pega também <code>max_tokens</code>, <code>refusal</code> e <code>stop_sequence</code>. Sem tratamento, texto cortado ou vazio vira “resposta final” <a class="tag t-doc" href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works" target="_blank" rel="noopener">doc oficial</a>.</li>
+      <li><b>“Recusa é um erro HTTP.”</b> É um <code>200</code> com <code>stop_reason: "refusal"</code> <a class="tag t-doc" href="https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback" target="_blank" rel="noopener">doc oficial</a>.</li>
+      <li><b>“Negar uma ferramenta é não responder.”</b> Todo <code>tool_use</code> recebe um <code>tool_result</code>. O negado vai com <code>is_error: true</code> e uma explicação <a class="tag t-doc" href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use" target="_blank" rel="noopener">doc oficial</a>.</li>
+      <li><b>“O Tool Runner elimina o laço.”</b> Ele roda o mesmo laço, dentro do seu processo. Para aprovação, log próprio ou execução condicional, a doc indica o loop manual <a class="tag t-doc" href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-runner" target="_blank" rel="noopener">doc oficial</a>.</li>
+    </ul>
+    <h3>O que ficou de fora deste recorte</h3>
+    <ul>
+      <li><code>pause_turn</code> e server tools; <code>stop_sequence</code>.</li>
+      <li>Como continuar uma resposta cortada por <code>max_tokens</code>; fallback automático de recusas (<code>fallbacks</code>).</li>
+      <li>Execução concorrente dos blocos; <code>max_tokens</code> cortando um <code>tool_use</code> no meio.</li>
+      <li>Crescimento do contexto a cada volta (custo, compactação), blocos <code>thinking</code>, streaming.</li>
+    </ul>
+    <h3>Fontes (consultadas em 2026-09-24)</h3>
+    <ul>
+      <li>Material: conteúdo colado na invocação de <code>/visualizar-conceito</code> (pseudocódigo “Modelo mental: o loop” e a leitura linha a linha).</li>
+      <li><a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works" target="_blank" rel="noopener">How tool use works</a> · <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview" target="_blank" rel="noopener">Tool use overview</a> · <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls" target="_blank" rel="noopener">Handle tool calls</a> · <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use" target="_blank" rel="noopener">Parallel tool use</a> · <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-runner" target="_blank" rel="noopener">Tool runner</a> · <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/build-a-tool-using-agent" target="_blank" rel="noopener">Build a tool-using agent</a></li>
+      <li><a href="https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons" target="_blank" rel="noopener">Stop reasons and fallback</a> · <a href="https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback" target="_blank" rel="noopener">Refusals and fallback</a> · <a href="https://platform.claude.com/docs/en/build-with-claude/working-with-messages" target="_blank" rel="noopener">Using the Messages API</a> · <a href="https://platform.claude.com/docs/en/api/errors" target="_blank" rel="noopener">API errors</a></li>
+    </ul>
+  </div>
+</section>
+
+<footer>Gerado pela skill <code>/visualizar-conceito</code> em 2026-09-24. Arquivo autônomo, sem dependências externas; os links acima só abrem se clicados.</footer>
+</div>
+
+<script>
+'use strict';
+
+/* ───────── origens ───────── */
+const DOC = {
+  handle:   'https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls',
+  overview: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview',
+  how:      'https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works',
+  parallel: 'https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use',
+  runner:   'https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-runner',
+  stop:     'https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons',
+  refusal:  'https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback',
+  msgs:     'https://platform.claude.com/docs/en/build-with-claude/working-with-messages',
+  errors:   'https://platform.claude.com/docs/en/api/errors',
+};
+const M = '<span class="tag t-mat" title="Está no conteúdo colado na invocação">material</span>';
+const S = '<span class="tag t-sim" title="Hipótese criada para o exemplo, não é comportamento garantido">simulação</span>';
+const D = (k) => `<a class="tag t-doc" href="${DOC[k]}" target="_blank" rel="noopener" title="${DOC[k]} · consultado em 2026-09-24">doc oficial</a>`;
+
+/* ───────── cenário (simulação) ───────── */
+const MODEL = 'claude-opus-5-5';
+const PERG = 'Meu pedido 4471 ainda não chegou. Onde ele está? Se o frete for reembolsável, já pode pedir o reembolso.';
+const TOOLS = [
+  { name: 'buscar_pedido', description: 'Status e código de rastreio de um pedido.', input_schema: { type: 'object', properties: { pedido_id: { type: 'string' } }, required: ['pedido_id'] } },
+  { name: 'consultar_politica', description: 'Regra vigente da loja para um tema.', input_schema: { type: 'object', properties: { tema: { type: 'string' } }, required: ['tema'] } },
+  { name: 'rastrear_envio', description: 'Último evento de transporte de um código de rastreio.', input_schema: { type: 'object', properties: { codigo: { type: 'string' } }, required: ['codigo'] } },
+  { name: 'abrir_reembolso', description: 'Abre um reembolso (efeito colateral: gera crédito ao cliente).', input_schema: { type: 'object', properties: { pedido_id: { type: 'string' }, motivo: { type: 'string' }, valor: { type: 'number' } }, required: ['pedido_id', 'motivo', 'valor'] } },
+];
+const TOOLS_REF = '(as mesmas 4 definições da requisição #1)';
+const RESULT = {
+  buscar_pedido: { status: 'em_transito', codigo_rastreio: 'BR7730', prazo_original: '2026-09-18' },
+  consultar_politica: { regra: 'atraso acima de 5 dias: frete reembolsável' },
+  rastrear_envio: { ultimo_evento: 'saiu para entrega', cidade: 'Campinas', previsao: '2026-09-25' },
+  abrir_reembolso: { protocolo: 'RB-2291', valor: 'R$ 18,90', status: 'aberto' },
+};
+const FACT = { buscar_pedido: 'ped', consultar_politica: 'pol', rastrear_envio: 'ras' };
+const SUF = { buscar_pedido: 'PED', consultar_politica: 'POL', rastrear_envio: 'RAS', abrir_reembolso: 'REE' };
+const NEG_TXT = 'Negado pela aplicação: reembolso exige aprovação de um atendente. Diga ao cliente que o pedido foi encaminhado.';
+const RUNAWAY = 5;   // sem limite no código, o simulador para aqui
+
+function script(k) {
+  if (k === 1) return { txt: 'Vou consultar o pedido 4471 e a política de frete.', calls: [['buscar_pedido', { pedido_id: '4471' }], ['consultar_politica', { tema: 'reembolso_frete' }]], why: 'dois pedidos independentes na mesma resposta' };
+  if (k === 2) return { txt: 'Está em trânsito. Vou ver onde o envio BR7730 está agora.', calls: [['rastrear_envio', { codigo: 'BR7730' }]], why: 'usa o código de rastreio que acabou de receber' };
+  if (k === 3) return { txt: 'O atraso passa de 5 dias: vou abrir o reembolso do frete.', calls: [['abrir_reembolso', { pedido_id: '4471', motivo: 'atraso', valor: 18.9 }]], why: 'uma ação com efeito colateral' };
+  return { txt: 'Vou conferir o rastreio mais uma vez.', calls: [['rastrear_envio', { codigo: 'BR7730' }]], why: 'repete uma consulta que já fez' };
+}
+function finalText(f) {
+  if (!f.ped) return 'Sinto muito pelo atraso! Não consegui consultar o pedido 4471 agora. Pode me dar alguns minutos?';
+  let t = `Seu pedido 4471 ${f.ras ? 'saiu para entrega em Campinas, com previsão para 25/09' : 'está em trânsito (rastreio BR7730)'}.`;
+  if (f.pol) t += ' O prazo era 18/09: são 6 dias de atraso e, pela política, o frete é reembolsável.';
+  if (f.reemb === 'aberto') t += ' Já abri o reembolso do frete: protocolo RB-2291, R$ 18,90.';
+  else if (f.reemb === 'negado') t += ' O reembolso precisa da aprovação de um atendente; já deixei encaminhado.';
+  else if (f.pol) t += ' Quer que eu abra o reembolso?';
+  return t;
+}
+const cut = (t) => t.slice(0, Math.max(28, Math.floor(t.length * 0.55)));
+function buildResp(k, kind, facts) {
+  const base = { id: `msg_0${k}loop`, type: 'message', role: 'assistant', model: MODEL };
+  if (kind === 'tool_use') {
+    const sc = script(k);
+    return { ...base, content: [{ type: 'text', text: sc.txt }, ...sc.calls.map(([n, inp]) => ({ type: 'tool_use', id: `toolu_0${k}${SUF[n]}`, name: n, input: inp }))], stop_reason: 'tool_use', stop_details: null };
+  }
+  if (kind === 'end_turn') return { ...base, content: [{ type: 'text', text: finalText(facts) }], stop_reason: 'end_turn', stop_details: null };
+  if (kind === 'max_tokens') return { ...base, content: [{ type: 'text', text: cut(finalText(facts)) }], stop_reason: 'max_tokens', stop_details: null };
+  return { ...base, content: [], stop_reason: 'refusal', stop_details: { type: 'refusal', category: null, explanation: null } };
+}
+
+const clone = (x) => JSON.parse(JSON.stringify(x));
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const tusOf = (resp) => resp.content.filter((b) => b.type === 'tool_use');
+const body = (msgs, first) => ({ model: MODEL, max_tokens: 1024, tools: first ? TOOLS.map((t) => ({ name: t.name, description: t.description, input_schema: '{…}' })) : TOOLS_REF, messages: clone(msgs) });
+
+/* tool_use sem tool_result logo depois (o que a API cobraria) */
+function semResultado(msgs) {
+  const out = [];
+  msgs.forEach((m, i) => {
+    if (m.role !== 'assistant' || !Array.isArray(m.content)) return;
+    const nx = msgs[i + 1];
+    const got = nx && nx.role === 'user' && Array.isArray(nx.content) ? nx.content.filter((b) => b.type === 'tool_result').map((b) => b.tool_use_id) : [];
+    m.content.filter((b) => b.type === 'tool_use' && !got.includes(b.id)).forEach((b) => out.push(b.id));
+  });
+  return out;
+}
+/* validação que a API faria antes de o modelo ver a requisição */
+function validar(msgs) {
+  for (let i = 0; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (m.role === 'user' && Array.isArray(m.content)) {
+      const trs = m.content.filter((b) => b.type === 'tool_result').map((b) => b.tool_use_id);
+      if (!trs.length) continue;
+      const pv = msgs[i - 1];
+      const have = pv && pv.role === 'assistant' && Array.isArray(pv.content) ? pv.content.filter((b) => b.type === 'tool_use').map((b) => b.id) : [];
+      const orphan = trs.filter((id) => !have.includes(id));
+      if (orphan.length) return { idx: i, ids: orphan };
+    }
+  }
+  const miss = semResultado(msgs);
+  return miss.length ? { idx: -1, ids: miss, missing: true } : null;
+}
+
+/* ───────── o código (muda com os ajustes) ───────── */
+const CFG_DEFAULT = { grava: 'content', parada: 'material', limite: 'nenhum' };
+function codeLines(c) {
+  const L = [];
+  L.push({ id: 'L1', i: 0, t: 'messages = [ pergunta do usuário ]' });
+  L.push(c.limite === 'max3' ? { id: 'L2', i: 0, t: 'repita (no máximo MAX = 3 voltas):', tag: 'adj' } : { id: 'L2', i: 0, t: 'repita:' });
+  L.push({ id: 'L3', i: 1, t: 'response = POST /v1/messages  (model, tools, messages)     # seção 3, request' });
+  L.push(c.grava === 'content'
+    ? { id: 'L4', i: 1, t: 'messages += response.content      # grava o turno do assistant (com os tool_use dentro!)' }
+    : { id: 'L4', i: 1, t: 'messages += texto(response.content)      # só o texto: os tool_use ficam de fora', tag: 'bug' });
+  L.push({ id: 'L5', i: 1, t: 'se response.stop_reason == "tool_use":' });
+  L.push({ id: 'L6', i: 2, t: 'para cada bloco tool_use em response.content:' });
+  L.push({ id: 'L7', i: 3, t: 'resultado = executar(bloco.name, bloco.input)      # o código é SEU' });
+  L.push({ id: 'L8', i: 3, t: 'messages += tool_result(bloco.id, resultado)       # numa única msg user' });
+  L.push({ id: 'L9', i: 2, t: '# volta ao topo — o modelo decide o próximo passo' });
+  if (c.parada === 'trata') {
+    L.push({ id: 'LM', i: 1, t: 'senão se response.stop_reason == "max_tokens":', tag: 'adj' });
+    L.push({ id: 'LM2', i: 2, t: 'incompleta: não mostre; aumente max_tokens ou continue', tag: 'adj' });
+    L.push({ id: 'LR', i: 1, t: 'senão se response.stop_reason == "refusal":', tag: 'adj' });
+    L.push({ id: 'LR2', i: 2, t: 'descarte o parcial; leia stop_details; fallback ou humano', tag: 'adj' });
+  }
+  L.push({ id: 'L10', i: 1, t: 'senão:' });
+  L.push({ id: 'L11', i: 2, t: 'pare — a resposta final está em response.content' });
+  if (c.limite === 'max3') L.push({ id: 'LL', i: 0, t: 'se saiu pelo limite: pare sem resposta final e escale para um humano', tag: 'adj' });
+  return L;
+}
+
+/* ───────── roteiro: caminho puro a partir de (decisões, código) ───────── */
+function initState() {
+  return { volta: 0, reqs: 0, stop: null, cond: null, bloco: null, resultado: null, msgs: [], log: [], voltas: [], facts: {}, execs: 0, negados: 0, saida: { tipo: 'nada' } };
+}
+
+function buildPath(dec, c) {
+  const steps = [];
+  const st = initState();
+  const LN = Object.fromEntries(codeLines(c).map((l, i) => [l.id, i + 1]));
+  const MAXV = c.limite === 'max3' ? 3 : null;
+  const add = (s) => { s.index = steps.length; s.state = clone(st); steps.push(s); return s; };
+  const decision = (s) => {
+    const v = dec[s.decision.id];
+    s.kind = 'decision'; s.nocount = true;
+    s.decision.value = v === undefined ? null : v;
+    add(s);
+    return v !== undefined;
+  };
+  const log = (txt, lvl) => st.log.push({ txt, lvl: lvl || '' });
+
+  /* 0: visão geral */
+  add({ kind: 'info', actor: null, pc: [], nocount: true, title: 'Visão geral: o laço que é o agente',
+    explain: `<p>O material descreve o <b>agent loop</b> em pseudocódigo e pede para lê-lo linha a linha, “porque cada linha é uma regra já estudada” ${M}. Aqui o pseudocódigo <b>roda</b>: a seta ▶ marca a linha em execução e as variáveis mudam no painel ao lado.</p>
+      <p>Você controla duas coisas. Primeiro, <b>o código</b>: os ajustes acima definem o que gravar em <code>messages</code>, quais <code>stop_reason</code> tratar e se há limite de voltas. Segundo, <b>o modelo</b>: a cada resposta você escolhe o <code>stop_reason</code> que ele devolve ${S}. Com o mesmo roteiro do modelo e um código diferente, o resultado muda.</p>
+      <p>Participantes: a <b>aplicação</b> (o laço é código seu), a <b>API/modelo</b> (decide o próximo passo), as <b>ferramentas</b> (funções da aplicação) e o <b>cliente</b>.</p>
+      <p class="note">Play avança e para em cada decisão. Os “roteiros prontos” preenchem as decisões do modelo de uma vez, e aí o Play vai até o fim.</p>`,
+    data: { title: 'Cenário do exemplo', json: { aplicacao: 'agente de suporte de uma loja', modelo: MODEL, pergunta_do_cliente: PERG, ferramentas: TOOLS.map((t) => `${t.name}: ${t.description}`) }, cap: `Tudo inventado ${S}.` },
+    trans: ['Próxima etapa: a linha 1 cria o histórico.'] });
+
+  /* linha 1 */
+  st.msgs.push({ role: 'user', content: PERG }); st.saida = { tipo: 'digitando' };
+  add({ kind: 'info', actor: 'app', pc: ['L1'], title: 'messages = [ pergunta do usuário ]',
+    explain: `<p>O histórico começa com a pergunta. A API é stateless: tudo o que o modelo souber virá desta lista, enviada inteira a cada volta ${D('msgs')}.</p>`,
+    data: { title: 'messages depois da linha 1', json: st.msgs, hl: ['role=user'] },
+    trans: [`Linha ${LN.L2}: entra no laço.`] });
+
+  for (let k = 1; ; k++) {
+    /* topo do laço */
+    if (MAXV && k > MAXV) {
+      st.saida = { tipo: 'escala' }; st.bloco = null; st.resultado = null;
+      log(`limite de ${MAXV} voltas atingido: pare sem resposta final e escale`, 'warn');
+      add({ kind: 'end', ok: true, actor: 'app', pc: ['L2', 'LL'], title: `Topo do laço: ${MAXV} voltas feitas, a ${k}ª não acontece`,
+        explain: `<p>O cabeçalho do laço confere o contador antes do POST: ${MAXV} voltas feitas, fim. Não existe resposta final, e a aplicação escala para um humano ${S}. Repare que os resultados da volta ${MAXV} foram executados e gravados, mas nunca chegaram ao modelo.</p>
+          <p>O limite é o que o material recomenda para uma implementação real: “um agente que nunca para é um incidente à espera” ${M}. Um teto baixo demais corta um trabalho legítimo, como pode acontecer aqui.</p>`,
+        verdict: `Parada controlada pelo seu código. Quem pede mais voltas é o modelo (tool_use); quem põe o teto é você.`,
+        data: { title: 'Contador do laço', json: { voltas_feitas: k - 1, MAX: MAXV, 'tool_result gravados e nunca enviados': st.msgs[st.msgs.length - 1].content.map((b) => b.tool_use_id) }, hl: ['voltas_feitas', 'MAX'] },
+        trans: [] });
+      return steps;
+    }
+
+    /* POST */
+    st.volta = k; st.reqs += 1; st.stop = null; st.cond = null; st.bloco = null; st.resultado = null; st.saida = { tipo: 'digitando' };
+    const erro = validar(st.msgs);
+    add({ kind: 'info', actor: 'app', pc: ['L2', 'L3'], title: k === 1 ? 'Volta 1 · POST /v1/messages (requisição #1)' : `Volta ${k} · de volta ao topo: POST #${k}`,
+      explain: k === 1
+        ? `<p>A requisição leva <code>model</code>, <code>tools</code> (só as definições, nunca o código) e o histórico inteiro ${D('how')}.</p>`
+        : `<p>De volta ao topo, com ${st.msgs.length} mensagens no histórico. Cada volta reenvia tudo: é por isso que o histórico cresce e o modelo “lembra” das ferramentas anteriores ${D('msgs')}.${MAXV ? ` O contador do seu código marca volta ${k} de no máximo ${MAXV}.` : ''}</p>`,
+      data: { title: `Corpo da requisição #${k}`, json: body(st.msgs, k === 1), hl: k === 1 ? ['tools', 'role=user'] : ['role=assistant', 'type=tool_use', 'tool_use_id'] },
+      trans: erro ? ['A API valida o corpo antes de o modelo ver qualquer coisa.'] : ['O modelo responde: você escolhe o stop_reason na próxima etapa.'] });
+
+    if (erro) {
+      st.saida = { tipo: 'erro' }; st.reqs = k; st.voltas.push({ k, stop: 'http_400', tools: [] });
+      log(`POST #${k} → 400 invalid_request_error`, 'deny');
+      add({ kind: 'end', ok: false, actor: 'api', pc: ['L3'], nocount: true, title: `HTTP 400: a requisição #${k} não passa na validação`,
+        explain: `<p>O <code>tool_result</code> de <code>${erro.ids.join('</code>, <code>')}</code> responde a um pedido que não está no histórico: a linha ${LN.L4} gravou só o texto e deixou os <code>tool_use</code> de fora. “Quem grava só o texto quebra o elo do tool_use_id” ${M}. A regra: cada <code>tool_result</code> vem logo depois do seu <code>tool_use</code> ${D('handle')}. 400 quer dizer problema de formato ou de conteúdo ${D('errors')}.</p>`,
+        verdict: 'O erro da linha 4 é silencioso até aparecer um tool_use. Com end_turn direto, gravar só o texto funciona. A falha aparece uma volta depois, na requisição seguinte, longe da linha que a causou.',
+        data: { title: 'Resposta da API', json: { type: 'error', error: { type: 'invalid_request_error', message: `messages.${erro.idx}.content.0: unexpected tool_use_id found in tool_result blocks: ${erro.ids.join(', ')}. Each tool_result block must have a corresponding tool_use block in the previous message.` }, request_id: 'req_011Cilustrativo' }, hl: ['type=invalid_request_error', 'message'],
+          cap: `A regra violada está na doc ${D('handle')}. O texto desta mensagem de erro não aparece na doc; o mostrado é ilustrativo ${S}.` },
+        trans: [] });
+      return steps;
+    }
+
+    /* o modelo decide */
+    const sc = script(k);
+    const ok = decision({ actor: 'voce-modelo', pc: ['L3'], title: `Você é o modelo: o que a resposta #${k} traz?`,
+      explain: `<p>A linha ${LN.L3} está esperando a resposta. Quem decide o próximo passo é o modelo, e aqui esse papel é seu ${S}. O <code>stop_reason</code> que você escolher decide, na linha ${LN.L5}, se o laço continua.</p>`,
+      decision: { id: `m${k}`, prompt: `Resposta #${k}:`, options: [
+        { v: 'tool_use', label: `tool_use: pede ${sc.calls.map((x) => x[0]).join(' + ')}`, small: sc.why },
+        { v: 'end_turn', label: 'end_turn: responde ao cliente com o que já sabe', small: k === 1 ? 'sem consultar nada' : 'encerra por conta própria' },
+        { v: 'max_tokens', label: 'max_tokens: a resposta estoura o teto e é cortada', small: 'texto incompleto' },
+        { v: 'refusal', label: 'refusal: o classificador recusa o pedido', small: 'content vazio + stop_details' },
+      ] },
+      data: { title: 'O que já está no histórico', json: { mensagens: st.msgs.length, ferramentas_ja_executadas: st.execs, fatos_que_o_modelo_ja_tem: Object.keys(st.facts) }, hl: [] },
+      trans: [] });
+    if (!ok) return steps;
+
+    const kind = dec[`m${k}`];
+    const resp = buildResp(k, kind, st.facts);
+    st.stop = kind;
+    st.voltas.push({ k, stop: kind, tools: kind === 'tool_use' ? tusOf(resp).map((b) => ({ name: b.name })) : [] });
+    log(`POST #${k} → 200 · stop_reason=${kind}`, kind === 'tool_use' || kind === 'end_turn' ? '' : 'warn');
+    const respExpl = {
+      tool_use: `<p><code>stop_reason: "tool_use"</code> com ${tusOf(resp).length} bloco(s) <code>tool_use</code> ${S}. O texto que vem junto não é a resposta final: é intenção ${M}.</p>`,
+      end_turn: `<p><code>stop_reason: "end_turn"</code>: a resposta terminou naturalmente ${D('stop')}. O texto usa só o que o modelo já tinha no histórico ${S}.</p>`,
+      max_tokens: `<p>A resposta bateu no teto de <code>max_tokens</code> e foi cortada ${D('stop')}. O texto termina no meio de uma palavra ${S}.</p>`,
+      refusal: `<p>Recusa: é uma resposta normal (HTTP 200), não um erro ${D('refusal')}. Quando a recusa acontece antes de qualquer saída, <code>content</code> vem vazio. <code>stop_details</code> explica, e <code>category</code> e <code>explanation</code> podem ser <code>null</code> ${D('refusal')}. Neste cenário de suporte, a recusa é improvável: ela está aqui para testar o código ${S}.</p>`,
+    }[kind];
+    add({ kind: 'info', actor: 'api', pc: ['L3'], nocount: true, title: `Resposta #${k}: stop_reason "${kind}"`,
+      explain: respExpl,
+      data: { title: `Resposta #${k} (corpo JSON)`, json: resp, hl: ['stop_reason', 'type=tool_use', 'stop_details', 'text'] },
+      trans: [`Linha ${LN.L4}: gravar a resposta no histórico.`] });
+
+    /* linha 4 */
+    const dropped = tusOf(resp).map((b) => b.id);
+    if (c.grava === 'content') st.msgs.push({ role: 'assistant', content: clone(resp.content) });
+    else st.msgs.push({ role: 'assistant', content: resp.content.filter((b) => b.type === 'text').map((b) => b.text).join('') });
+    add({ kind: 'info', actor: 'app', pc: ['L4'], title: c.grava === 'content' ? 'messages += response.content' : 'messages += texto(response.content)',
+      explain: c.grava === 'content'
+        ? `<p>O turno do assistant entra inteiro, com os <code>tool_use</code> dentro ${M}. É esse registro que dá sentido aos <code>tool_use_id</code> da próxima mensagem. No código da doc: <code>messages.append({"role": "assistant", "content": response.content})</code> ${D('overview')}.</p>${dropped.length ? '' : '<p class="note">Esta resposta não tem tool_use, mas a regra é a mesma: grava tudo.</p>'}`
+        : (dropped.length
+          ? `<p>Entrou só o texto. Os blocos <code>${dropped.join('</code>, <code>')}</code> ficaram de fora ${M}. Nada quebra agora. Quebra na próxima requisição, quando os <code>tool_result</code> apontarem para ids que o histórico não tem.</p>`
+          : `<p>Sem <code>tool_use</code> nesta resposta, gravar só o texto não perde nada. É por isso que esse erro passa em testes simples ${S}.</p>`),
+      data: { title: 'Mensagem acrescentada ao histórico', json: c.grava === 'content' ? { gravado: st.msgs[st.msgs.length - 1] } : { gravado: st.msgs[st.msgs.length - 1], 'tool_use que ficaram de fora': dropped }, hl: c.grava === 'content' ? ['type=tool_use', 'role=assistant'] : ['tool_use que ficaram de fora', 'role=assistant'] },
+      trans: [`Linha ${LN.L5}: testar o stop_reason.`] });
+
+    /* linha 5 */
+    const cond = kind === 'tool_use';
+    st.cond = cond;
+    const nextLine = cond ? `linha ${LN.L6} (para cada bloco)` : (c.parada === 'trata' && kind === 'max_tokens' ? `linha ${LN.LM} (senão se max_tokens)` : c.parada === 'trata' && kind === 'refusal' ? `linha ${LN.LR} (senão se refusal)` : `linha ${LN.L10} (senão)`);
+    add({ kind: 'info', actor: 'app', pc: ['L5'], title: `Condição: stop_reason == "tool_use" → ${cond}`,
+      explain: `<p>É aqui que o <code>stop_reason</code> entra no fluxo: ele é a condição do laço, um sinal de controle e não um campo informativo ${M}. O loop canônico repete enquanto o <code>stop_reason</code> for <code>"tool_use"</code> e sai com qualquer outro valor ${D('how')}.</p><p>Resultado: <b>${cond}</b>. O programa segue para a ${nextLine}.</p>`,
+      data: { title: 'Avaliação da linha 5', json: { 'response.stop_reason': kind, 'stop_reason == "tool_use"': cond, proxima: nextLine }, hl: ['stop_reason == "tool_use"'] },
+      trans: [cond ? 'Executar cada bloco tool_use.' : 'Sair do laço pelo ramo correspondente.'] });
+
+    if (cond) {
+      const blocks = tusOf(resp);
+      let first = true;
+      for (const [j, b] of blocks.entries()) {
+        st.bloco = { id: b.id, name: b.name }; st.resultado = null;
+        let negado = false;
+        if (b.name === 'abrir_reembolso') {
+          const okv = decision({ actor: 'voce', pc: ['L7'], title: 'Antes de executar abrir_reembolso: o seu código valida?',
+            explain: `<p>Este pedido tem efeito colateral: gera crédito para o cliente. Como a execução é sua, cada volta é uma chance de validar, negar e logar ${M}. A doc indica o loop manual justamente para aprovação humana, log próprio ou execução condicional ${D('runner')}.</p>`,
+            decision: { id: `v${k}`, prompt: `Pedido ${b.id} · abrir_reembolso ${JSON.stringify(b.input)}:`, options: [
+              { v: 'executar', label: 'Executar: abre o reembolso', small: 'a política permite' },
+              { v: 'negar', label: 'Negar: devolve tool_result com is_error: true', small: 'reembolso exige aprovação de um atendente' },
+            ] },
+            data: { title: 'O pedido do modelo', json: { id: b.id, name: b.name, input: b.input }, hl: ['name', 'input'] },
+            trans: [] });
+          if (!okv) return steps;
+          negado = dec[`v${k}`] === 'negar';
+        }
+        const trb = negado
+          ? { type: 'tool_result', tool_use_id: b.id, content: NEG_TXT, is_error: true }
+          : { type: 'tool_result', tool_use_id: b.id, content: JSON.stringify(RESULT[b.name]) };
+        if (first) st.msgs.push({ role: 'user', content: [trb] }); else st.msgs[st.msgs.length - 1].content.push(trb);
+        if (negado) { st.negados += 1; st.facts.reemb = 'negado'; st.voltas[st.voltas.length - 1].tools[j].negado = true; log(`executar ${b.name}(${JSON.stringify(b.input)}) → NEGADO pela política`, 'deny'); }
+        else { st.execs += 1; if (FACT[b.name]) st.facts[FACT[b.name]] = true; if (b.name === 'abrir_reembolso') st.facts.reemb = 'aberto'; log(`executar ${b.name}(${JSON.stringify(b.input)}) → ok`, 'ok'); }
+        st.resultado = negado ? 'is_error' : RESULT[b.name];
+        add({ kind: 'info', actor: 'tools', pc: ['L6', 'L7', 'L8'], title: `Bloco ${j + 1} de ${blocks.length}: ${negado ? 'negado' : 'executar'} ${b.name}`,
+          explain: negado
+            ? `<p>A aplicação não executou, mas respondeu: todo <code>tool_use</code> recebe um <code>tool_result</code>, e o não executado vai com <code>is_error: true</code> e uma explicação ${D('parallel')}. O que o modelo faz com isso na próxima volta é ${S}.</p>`
+            : `<p>Linha ${LN.L7}: <code>executar</code> roda o <b>seu</b> código ${M}. “The model never executes anything on its own.” ${D('how')}</p><p>Linha ${LN.L8}: o resultado vira <code>tool_result</code> com <code>tool_use_id</code> = <code>bloco.id</code>. ${first ? 'Como é o primeiro da volta, ele cria a mensagem user.' : 'Ele entra na <b>mesma</b> mensagem user do anterior.'} Todos os resultados de uma volta vão juntos ${D('parallel')}.</p>`,
+          data: { title: 'Linhas 7 e 8 para este bloco', json: { bloco: { id: b.id, name: b.name, input: b.input }, resultado: negado ? NEG_TXT : RESULT[b.name], tool_result: trb, mensagem_user: first ? 'criada agora' : 'a mesma do bloco anterior' }, hl: ['id', 'tool_use_id', 'is_error'], cap: `Resultado inventado ${S}.` },
+          trans: [j + 1 < blocks.length ? 'Próximo bloco do para cada.' : `Fim do para cada: linha ${LN.L9}.`] });
+        first = false;
+      }
+      st.bloco = null; st.resultado = null;
+      const ids = blocks.map((b) => b.id);
+      const runaway = !MAXV && k >= RUNAWAY;
+      add({ kind: runaway ? 'end' : 'info', ok: false, actor: 'app', pc: ['L9'], title: runaway ? `${k} voltas, e nada no código impede a próxima` : 'Volta ao topo: o modelo decide o próximo passo',
+        explain: runaway
+          ? `<p>O pseudocódigo do material não tem guarda. Enquanto o modelo devolver <code>tool_use</code>, o laço continua: “um agente que nunca para é um incidente à espera” ${M}. O simulador para aqui; o código real não pararia.</p><p class="note">Ligue o ajuste “MAX = 3” e rode o mesmo roteiro para comparar.</p>`
+          : `<p>Fim do <code>para cada</code>: ${ids.length} <code>tool_use</code>, ${ids.length} <code>tool_result</code>, os ids casados. O laço volta ao topo, e quem decide o próximo passo é o modelo ${M}. Nenhuma linha deste código decide quantas voltas haverá: isso sai do <code>stop_reason</code> de cada resposta.</p>`,
+        verdict: runaway ? `Sem limite, o número de voltas (e de requisições pagas: ${st.reqs}) depende só do modelo.` : undefined,
+        data: { title: `Fim da volta ${k}`, json: { 'tool_use desta volta': ids, 'tool_result desta volta': st.msgs[st.msgs.length - 1].content.map((x) => x.tool_use_id), 'tool_use sem tool_result': semResultado(st.msgs), mensagens_no_historico: st.msgs.length }, hl: ['tool_use sem tool_result'] },
+        trans: runaway ? [] : [MAXV ? `Topo do laço: volta ${k + 1} só acontece se ${k} < ${MAXV}.` : `Topo do laço: POST #${k + 1}.`] });
+      if (runaway) return steps;
+      continue;
+    }
+
+    /* não é tool_use */
+    const text = resp.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    if (c.parada === 'trata' && kind === 'max_tokens') {
+      st.saida = { tipo: 'incompleta-tratada' };
+      log('resposta incompleta (max_tokens): não exibida; aumentar max_tokens ou continuar', 'warn');
+      add({ kind: 'end', ok: true, actor: 'app', pc: ['LM', 'LM2'], title: 'senão se max_tokens: tratada como incompleta',
+        explain: `<p>A linha acrescentada intercepta: o texto cortado não chega ao cliente. O próximo passo é aumentar <code>max_tokens</code> ou continuar a resposta ${D('stop')}; como fazer isso ficou fora deste recorte. O material lista <code>max_tokens</code> entre o que “uma implementação real também trata” ${M}.</p>`,
+        verdict: 'Tratado: o código não confunde “parou” com “terminou”.',
+        data: { title: 'O que a aplicação reteve', json: { stop_reason: kind, texto_cortado_retido: text }, hl: ['stop_reason'] },
+        trans: [] });
+      return steps;
+    }
+    if (c.parada === 'trata' && kind === 'refusal') {
+      st.saida = { tipo: 'recusa-tratada' };
+      log('refusal: parcial descartado; stop_details registrado; fallback/humano acionado', 'warn');
+      add({ kind: 'end', ok: true, actor: 'app', pc: ['LR', 'LR2'], title: 'senão se refusal: tratada',
+        explain: `<p>A linha acrescentada descarta qualquer saída parcial (“treat any partial output as incomplete and discard it”), registra <code>stop_details</code> e tenta um modelo de fallback ou um humano ${D('refusal')}. A decisão sai do <code>stop_reason</code>, não do <code>content</code> ${D('refusal')}.</p>`,
+        verdict: 'Tratado: a recusa não vira “resposta final vazia”.',
+        data: { title: 'O que a aplicação registrou', json: { stop_reason: kind, stop_details: resp.stop_details, acao: 'fallback ou atendimento humano' }, hl: ['stop_reason', 'stop_details'] },
+        trans: [] });
+      return steps;
+    }
+    // senão: pare
+    const tipo = kind === 'end_turn' ? 'final' : kind === 'max_tokens' ? 'truncada' : 'vazia';
+    st.saida = { tipo, texto: text };
+    log(`resposta final exibida ao cliente (${kind})`, kind === 'end_turn' ? 'ok' : 'deny');
+    const fimExpl = {
+      final: `<p>Linha ${LN.L11}: <code>senão: pare</code>. A resposta final está em <code>response.content</code> ${M}, e para <code>end_turn</code> a doc diz “Use the response.” ${D('stop')}</p>`,
+      truncada: `<p>Sem tratamento, <code>max_tokens</code> cai no <code>senão</code>, e o texto cortado vira “resposta final” e é mostrado ao cliente. A doc manda aumentar <code>max_tokens</code> ou continuar ${D('stop')}, e o material avisa que uma implementação real trata esse caso ${M}.</p>`,
+      vazia: `<p>Sem tratamento, <code>refusal</code> cai no <code>senão</code>: “a resposta final está em <code>response.content</code>”, só que <code>content</code> está vazio. O cliente recebe nada, e o log registra sucesso. A doc manda decidir pelo <code>stop_reason</code> ${D('refusal')}.</p>`,
+    }[tipo];
+    add({ kind: 'end', ok: tipo === 'final', actor: 'app', pc: ['L10', 'L11'], title: tipo === 'final' ? `Pare: end_turn depois de ${k} volta(s)` : tipo === 'truncada' ? 'Pare: texto cortado exibido como resposta final' : 'Pare: resposta final vazia',
+      explain: fimExpl,
+      verdict: tipo === 'final'
+        ? `O laço rodou ${k} volta(s). Quem decidiu parar foi o modelo (end_turn); quem obedeceu foi a linha ${LN.L5}.`
+        : `O senão do material pega mais do que end_turn. Ligue “trata max_tokens e refusal” e rode o mesmo roteiro.`,
+      data: { title: 'Saída entregue ao cliente', json: { stop_reason: kind, 'response.content': resp.content }, hl: ['stop_reason', 'text'] },
+      trans: [] });
+    return steps;
+  }
+}
+
+/* ───────── motor ───────── */
+let cfg = { ...CFG_DEFAULT };
+let decisions = {};
+let path = [];
+let cur = 0, playing = false, timer = null, speed = 1;
+const BASE_MS = 2200;
+const $ = (id) => document.getElementById(id);
+const unresolved = (s) => s.kind === 'decision' && decisions[s.decision.id] === undefined;
+
+function rebuild() { path = buildPath(decisions, cfg); if (cur > path.length - 1) cur = path.length - 1; }
+function choose(step, value) {
+  for (const s of path) if (s.kind === 'decision' && s.index > step.index) delete decisions[s.decision.id];
+  decisions[step.decision.id] = value;
+  path = buildPath(decisions, cfg);
+  cur = step.index;
+  renderAll();
+}
+function tick() {
+  if (unresolved(path[cur]) || cur >= path.length - 1) { pause(); return; }
+  cur++; renderAll();
+  if (unresolved(path[cur]) || cur >= path.length - 1) pause();
+}
+function play() {
+  if (playing) return;
+  if (unresolved(path[cur]) || cur >= path.length - 1) { renderControls(); return; }
+  playing = true; timer = setInterval(tick, BASE_MS / speed); renderControls();
+}
+function pause() { playing = false; clearInterval(timer); timer = null; renderControls(); }
+function next() { if (!unresolved(path[cur]) && cur < path.length - 1) { cur++; renderAll(); } }
+function prev() { if (cur > 0) { cur--; renderAll(); } }
+function goto(i) { if (i >= 0 && i < path.length) { cur = i; renderAll(); } }
+function reset() { pause(); decisions = {}; rebuild(); cur = 0; note(''); renderAll(); }
+function setSpeed(v) { speed = v; if (playing) { pause(); play(); } }
+function setCfg(k, v) {
+  if (cfg[k] === v) return;
+  pause(); cfg = { ...cfg, [k]: v }; rebuild(); renderAll();
+  note('Código alterado: a execução foi refeita com o mesmo roteiro do modelo. Compare o resultado.');
+}
+const PRESETS = [
+  { name: 'Caminho feliz', dec: { m1: 'tool_use', m2: 'tool_use', m3: 'tool_use', v3: 'executar', m4: 'end_turn' } },
+  { name: 'Nega o reembolso', dec: { m1: 'tool_use', m2: 'tool_use', m3: 'tool_use', v3: 'negar', m4: 'end_turn' } },
+  { name: 'Modelo que não para', dec: { m1: 'tool_use', m2: 'tool_use', m3: 'tool_use', v3: 'executar', m4: 'tool_use', m5: 'tool_use' } },
+  { name: 'Resposta cortada', dec: { m1: 'tool_use', m2: 'max_tokens' } },
+  { name: 'Recusa', dec: { m1: 'refusal' } },
+];
+function loadPreset(i) {
+  pause(); decisions = { ...PRESETS[i].dec }; rebuild(); cur = 0; renderAll();
+  note(`Roteiro “${PRESETS[i].name}” carregado: as decisões do modelo já estão preenchidas, então o Play vai até o fim sem parar.`);
+}
+function note(t) { $('cfg-note').textContent = t; }
+
+/* ───────── renderização: tudo a partir de path[cur] ───────── */
+const ACTORS = { cli: ['cliente', 'a-cli'], app: ['aplicação (seu código)', 'a-app'], api: ['API / modelo', 'a-api'], tools: ['ferramenta (código da aplicação)', 'a-tools'], voce: ['você decide pela aplicação', 'a-voce'], 'voce-modelo': ['você faz o papel do modelo', 'a-voce'] };
+
+function renderAll() {
+  renderCfg(); renderControls(); renderTimeline(); renderChips(); renderCode(); renderStep();
+  renderState(); renderData(); renderVoltas(); renderLog(); renderOut(); renderTrans();
+  $('code-hint').textContent = 'Clique numa linha para ir à última vez em que ela rodou até aqui (ou à primeira depois).';
+}
+
+function renderCfg() {
+  document.querySelectorAll('.seg').forEach((g) => g.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(cfg[g.dataset.k] === b.dataset.v))));
+}
+function renderControls() {
+  const s = path[cur];
+  const blocked = unresolved(s) || cur >= path.length - 1;
+  $('btn-play').textContent = playing ? '❚❚ Pausar' : '▶ Play';
+  $('btn-play').disabled = !playing && blocked;
+  $('btn-next').disabled = blocked;
+  $('btn-prev').disabled = cur === 0;
+  const tail = unresolved(path[path.length - 1]) ? ' · o total cresce quando você decide' : '';
+  $('progress').textContent = `Etapa ${cur} de ${path.length - 1}${tail}`;
+}
+function renderTimeline() {
+  const el = $('timeline');
+  el.innerHTML = path.map((s, i) => {
+    const cls = ['tl'];
+    if (s.kind === 'decision') { cls.push('dec'); if (unresolved(s)) cls.push('open'); }
+    if (s.kind === 'end') cls.push('end', s.ok ? 'ok' : 'fail');
+    if (i < cur) cls.push('past');
+    if (i === cur) cls.push('cur');
+    return `<button type="button" class="${cls.join(' ')}" data-i="${i}" title="Etapa ${i}: ${esc(s.title)}" aria-label="Ir para a etapa ${i}: ${esc(s.title)}"></button>`;
+  }).join('') + (unresolved(path[path.length - 1]) ? '<span class="tl-more">◆ aguardando sua decisão…</span>' : '');
+  el.querySelectorAll('.tl').forEach((b) => b.addEventListener('click', () => { pause(); goto(+b.dataset.i); }));
+}
+function renderChips() {
+  const made = path.filter((s) => s.kind === 'decision' && !unresolved(s));
+  $('chips').innerHTML = made.length
+    ? 'Decisões deste caminho: ' + made.map((s) => `<button type="button" class="chip-dec" data-i="${s.index}" title="Voltar a esta decisão">◆ ${esc(s.decision.prompt.slice(0, 26))}${s.decision.prompt.length > 26 ? '…' : ''} <b>${esc(decisions[s.decision.id])}</b></button>`).join(' ')
+    : 'Nenhuma decisão tomada ainda.';
+  $('chips').querySelectorAll('.chip-dec').forEach((b) => b.addEventListener('click', () => { pause(); goto(+b.dataset.i); }));
+}
+
+function hiCode(t) {
+  let src = t, cm = '';
+  const h = t.indexOf('#');
+  if (h >= 0) { src = t.slice(0, h); cm = t.slice(h); }
+  let x = esc(src);
+  x = x.replace(/&quot;([^&]*)&quot;/g, '<span class="st">&quot;$1&quot;</span>');
+  x = x.replace(/(^|\s)(repita|senão se|senão|se|para cada|em|pare|no máximo)(?=[\s:(]|$)/g, '$1<span class="kw">$2</span>');
+  return x + (cm ? `<span class="cm">${esc(cm)}</span>` : '');
+}
+function renderCode() {
+  const lines = codeLines(cfg);
+  const s = path[cur];
+  const counts = {};
+  for (let i = 1; i <= cur; i++) { const p = path[i]; if (p.nocount) continue; (p.pc || []).forEach((id) => { counts[id] = (counts[id] || 0) + 1; }); }
+  const everRun = new Set(); path.forEach((p) => (p.pc || []).forEach((id) => everRun.add(id)));
+  const curSet = new Set(s.pc || []);
+  $('code').innerHTML = lines.map((l, i) => {
+    const cls = [];
+    if (l.tag === 'adj') cls.push('adj');
+    if (l.tag === 'bug') cls.push('bug');
+    if (curSet.has(l.id)) cls.push('cur');
+    if (!everRun.has(l.id)) cls.push('never');
+    const n = counts[l.id] || 0;
+    const badge = l.tag === 'adj' ? '<span class="badge adj">ajuste</span>' : l.tag === 'bug' ? '<span class="badge bug">erro</span>' : '';
+    return `<li class="${cls.join(' ')}" data-l="${l.id}" tabindex="0" aria-label="Linha ${i + 1}${curSet.has(l.id) ? ', em execução' : ''}, executada ${n} vez(es)">
+      <span class="cnt${n ? ' on' : ''}">${n ? '×' + n : '·'}</span><span class="arr">${curSet.has(l.id) ? '▶' : ''}</span><span class="cno">${i + 1}</span><span class="src" style="--i:${l.i}">${hiCode(l.t)}${badge}</span></li>`;
+  }).join('');
+  $('code').querySelectorAll('li').forEach((li) => {
+    li.addEventListener('click', () => lineClick(li.dataset.l));
+    li.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); lineClick(li.dataset.l); } });
+  });
+}
+function lineClick(id) {
+  let t = -1;
+  for (let i = cur; i >= 1; i--) if ((path[i].pc || []).includes(id) && !path[i].nocount) { t = i; break; }
+  if (t < 0) t = path.findIndex((p, i) => i > cur && (p.pc || []).includes(id));
+  const n = codeLines(cfg).findIndex((l) => l.id === id) + 1;
+  if (t >= 0) { pause(); goto(t); $('code-hint').textContent = `Linha ${n}: foi para a etapa ${t} (${path[t].title}).`; return; }
+  $('code-hint').textContent = `A linha ${n} não roda neste caminho. Mude uma decisão do modelo ou um ajuste do código para passar por ela.`;
+}
+
+function renderStep() {
+  const s = path[cur];
+  const [aname, acls] = s.actor ? ACTORS[s.actor] : ['visão geral', 'a-none'];
+  const lines = codeLines(cfg);
+  const pcTxt = (s.pc || []).map((id) => lines.findIndex((l) => l.id === id) + 1).filter((n) => n > 0);
+  let h = `<div class="stephead"><span class="stepno">Etapa ${cur} de ${path.length - 1}</span><span class="actor ${acls}">${aname}</span>`;
+  if (pcTxt.length) h += `<span class="pcline">▶ linha${pcTxt.length > 1 ? 's' : ''} ${pcTxt.join(', ')}</span>`;
+  if (s.kind === 'decision') h += '<span class="flag-dec">◆ decisão</span>';
+  if (s.kind === 'end') h += s.ok ? '<span class="flag-ok">■ fim</span>' : '<span class="flag-fail">■ fim com problema</span>';
+  h += `</div><h2>${esc(s.title)}</h2><div class="explain">${s.explain}</div>`;
+  if (s.kind === 'decision') {
+    const v = decisions[s.decision.id];
+    h += `<div class="decision"><div class="dprompt">${esc(s.decision.prompt)}</div><div class="dopts">` +
+      s.decision.options.map((o) => `<button type="button" class="opt${v === o.v ? ' sel' : ''}" data-v="${o.v}">${esc(o.label)}<small>${esc(o.small || '')}</small></button>`).join('') +
+      '</div>' + (v === undefined
+        ? '<p class="dwait">⏸ A simulação espera sua escolha. Play e Próxima ficam bloqueados até lá.</p>'
+        : '<p class="dok">Escolha feita. Trocar agora apaga as decisões seguintes e reconstrói o caminho.</p>') + '</div>';
+  }
+  if (s.verdict) h += `<div class="verdict ${s.ok ? 'ok' : 'fail'}"><b class="h">${s.ok ? '✓ Resultado' : '✗ Sintoma'}</b>${esc(s.verdict)}</div>`;
+  $('p-step').innerHTML = h;
+  $('p-step').querySelectorAll('.opt').forEach((b) => b.addEventListener('click', () => { pause(); choose(s, b.dataset.v); }));
+}
+
+function idList(list) { return list && list.length ? list.map((i) => `<span class="idl">${esc(i)}</span>`).join('') : '<span class="none">nenhum</span>'; }
+function blocksHTML(content) {
+  if (typeof content === 'string') return `<div class="blk"><span class="bt">text:</span> ${esc(content) || '<span class="none">(vazio)</span>'}</div>`;
+  if (!content.length) return '<div class="blk"><span class="none">content: [] (vazio)</span></div>';
+  return content.map((b) => {
+    if (b.type === 'text') return `<div class="blk"><span class="bt">text:</span> ${esc(b.text)}</div>`;
+    if (b.type === 'tool_use') return `<div class="blk"><span class="bt">tool_use</span> ${esc(b.name)} · id <b>${esc(b.id)}</b></div>`;
+    if (b.type === 'tool_result') return `<div class="blk${b.is_error ? ' err' : ''}"><span class="bt">tool_result</span> → tool_use_id <b>${esc(b.tool_use_id)}</b>${b.is_error ? ' · <b style="color:var(--err)">is_error</b>' : ''}</div>`;
+    return `<div class="blk">${esc(b.type)}</div>`;
+  }).join('');
+}
+function renderState() {
+  const st = path[cur].state;
+  const pv = cur > 0 ? path[cur - 1].state : null;
+  const chg = (v, pvv) => (pv && JSON.stringify(v) !== JSON.stringify(pvv) ? ' class="chg"' : '');
+  const MAXV = cfg.limite === 'max3' ? 3 : null;
+  const pend = semResultado(st.msgs), ppend = pv ? semResultado(pv.msgs) : [];
+  const rows = [
+    ['volta', st.volta, pv && pv.volta, st.volta ? `${st.volta}${MAXV ? ` de no máximo ${MAXV}` : ' <span class="none">(sem limite)</span>'}` : '—'],
+    ['<code>response.stop_reason</code>', st.stop, pv && pv.stop, st.stop ? `<code>${esc(st.stop)}</code>` : '<span class="none">sem resposta nesta volta ainda</span>'],
+    ['<code>stop_reason == "tool_use"</code>', st.cond, pv && pv.cond, st.cond === null ? '—' : `<span class="${st.cond ? 'bool-t' : 'bool-f'}">${st.cond}</span>`],
+    ['<code>bloco</code>', st.bloco, pv && pv.bloco, st.bloco ? `${esc(st.bloco.name)} <span class="idl">${esc(st.bloco.id)}</span>` : '—'],
+    ['<code>resultado</code>', st.resultado, pv && pv.resultado, st.resultado === null ? '—' : st.resultado === 'is_error' ? '<b style="color:var(--err)">negado (is_error)</b>' : `<code>${esc(JSON.stringify(st.resultado))}</code>`],
+    ['tool_use sem tool_result no histórico', pend, ppend, idList(pend)],
+    ['requisições enviadas', st.reqs, pv && pv.reqs, String(st.reqs)],
+    ['executadas · negadas', [st.execs, st.negados], pv && [pv.execs, pv.negados], `${st.execs} · ${st.negados}`],
+  ];
+  let h = '<table class="state">' + rows.map(([l, v, pvv, html]) => `<tr><th>${l}</th><td${chg(v, pvv)}>${html}</td></tr>`).join('') + '</table>';
+  h += `<div class="hist-t"><code>messages</code> (${st.msgs.length} mensage${st.msgs.length === 1 ? 'm' : 'ns'})</div>`;
+  if (!st.msgs.length) h += '<p class="none">ainda não existe</p>';
+  const prevMsgs = pv ? pv.msgs.map((m) => JSON.stringify(m)) : [];
+  st.msgs.forEach((m, i) => {
+    const isNew = pv && prevMsgs[i] !== JSON.stringify(m);
+    h += `<div class="msg ${m.role}${isNew ? ' new' : ''}"><div class="role">${m.role}<span class="idx">messages[${i}]</span>${isNew ? '<span class="nw">mudou nesta etapa</span>' : ''}</div>${blocksHTML(m.content)}</div>`;
+  });
+  $('state').innerHTML = h;
+}
+
+function jsonHTML(obj, hl) {
+  const lines = JSON.stringify(obj, null, 2).split('\n');
+  const tests = (hl || []).map((h) => {
+    const i = h.indexOf('=');
+    if (i < 0) return (line) => line.trimStart().startsWith(`"${h}":`);
+    const k = h.slice(0, i), v = h.slice(i + 1);
+    return (line) => line.includes(`"${k}": ${JSON.stringify(v)}`);
+  });
+  return lines.map((line) => {
+    const on = tests.some((t) => t(line));
+    let x = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    x = x.replace(/^(\s*)("(?:[^"\\]|\\.)*")(:\s?)/, '$1<span class="k">$2</span>$3');
+    x = x.replace(/(:\s|^\s*)("(?:[^"\\]|\\.)*")(,?)$/, '$1<span class="s">$2</span>$3');
+    x = x.replace(/(:\s|^\s*)(-?\d+(?:\.\d+)?|true|false|null)(,?)$/, '$1<span class="n">$2</span>$3');
+    return `<span class="jl${on ? ' hl' : ''}">${x || ' '}</span>`;
+  }).join('');
+}
+function renderData() {
+  const d = path[cur].data;
+  if (!d) { $('data').innerHTML = '<p class="none">Sem dados nesta etapa.</p>'; return; }
+  $('data').innerHTML = `<div class="data-title">${esc(d.title)}${d.hl && d.hl.length ? ' · linhas destacadas = campos relevantes nesta etapa' : ''}</div><pre class="json">${jsonHTML(d.json, d.hl)}</pre>${d.cap ? `<p class="data-cap">${d.cap}</p>` : ''}`;
+}
+
+function renderVoltas() {
+  const st = path[cur].state;
+  const pvN = cur > 0 ? path[cur - 1].state.voltas.length : 0;
+  const MAXV = cfg.limite === 'max3' ? 3 : null;
+  let h = '<div class="voltas">';
+  if (!st.voltas.length && !st.volta) h += '<span class="none">Nenhuma volta ainda.</span>';
+  st.voltas.forEach((v, i) => {
+    h += `<div class="vc${i >= pvN && cur > 0 ? ' new' : ''}"><div class="vh"><span>Volta ${v.k}</span><span>POST #${v.k}</span></div><span class="sr ${v.stop}">${v.stop === 'http_400' ? '400: rejeitada' : v.stop}</span>` +
+      (v.tools.length ? `<div class="tl2">${v.tools.map((t) => t.negado ? `<span class="den">✗ ${esc(t.name)}</span>` : esc(t.name)).join('<br>')}</div>` : '') + '</div>';
+  });
+  if (st.volta > st.voltas.length) h += `<div class="vc"><div class="vh"><span>Volta ${st.volta}</span><span>POST #${st.volta}</span></div><span class="sr wait">aguardando…</span></div>`;
+  h += '</div>';
+  const n = st.volta;
+  h += `<div class="limit-bar"><span>Voltas:</span>${Array.from({ length: Math.max(MAXV || 0, n, 1) }, (_, i) => `<i class="${i < n ? (MAXV && i >= MAXV ? 'over' : 'on') : ''}"></i>`).join('')}<span>${MAXV ? `teto do seu código: ${MAXV}` : 'sem teto no código: quem para o laço é o modelo'}</span></div>`;
+  $('voltas').innerHTML = h;
+}
+
+function renderLog() {
+  const st = path[cur].state;
+  const pvN = cur > 0 ? path[cur - 1].state.log.length : 0;
+  $('log').innerHTML = st.log.length
+    ? '<div class="log">' + st.log.map((l, i) => `<div class="${l.lvl}${i >= pvN && cur > 0 ? ' new' : ''}">${String(i + 1).padStart(2, '0')} ${esc(l.txt)}</div>`).join('') + '</div><p class="data-cap">Cada volta passa pelo seu código: é aí que dá para validar, negar e logar ' + M + '.</p>'
+    : '<p class="none">Nada registrado ainda.</p>';
+}
+
+function renderOut() {
+  const st = path[cur].state;
+  const o = st.saida;
+  let h = '<div class="chat">';
+  if (o.tipo === 'nada') h += '<span class="bub sys">(a conversa ainda não começou)</span>';
+  else h += `<div class="bub cli"><span class="who">cliente</span>${esc(PERG)}</div>`;
+  if (o.tipo === 'digitando') h += '<div class="typing" role="status">suporte digitando <i></i><i></i><i></i></div>';
+  if (o.tipo === 'final') h += `<div class="bub app"><span class="who">suporte</span>${esc(o.texto)}</div>`;
+  if (o.tipo === 'truncada') h += `<div class="bub app bad"><span class="who">suporte</span>${esc(o.texto)}<span class="cut"> ✂</span></div><span class="bub sys err">texto cortado exibido como se fosse a resposta</span>`;
+  if (o.tipo === 'vazia') h += '<div class="bub app bad"><span class="who">suporte</span><span class="none">(mensagem vazia)</span></div><span class="bub sys err">content vazio exibido como resposta final; o log diz “sucesso”</span>';
+  if (o.tipo === 'erro') h += '<span class="bub sys err">(a aplicação recebeu um 400 e não tem o que mostrar)</span>';
+  if (o.tipo === 'escala') h += '<div class="bub app"><span class="who">suporte</span>Vou transferir você para um atendente para concluir o atendimento.</div>';
+  if (o.tipo === 'incompleta-tratada') h += '<div class="typing" role="status">suporte digitando <i></i><i></i><i></i></div><span class="bub sys">o texto cortado foi retido; a aplicação vai pedir o resto</span>';
+  if (o.tipo === 'recusa-tratada') h += '<div class="bub app"><span class="who">suporte</span>Vou transferir você para um atendente.</div><span class="bub sys">recusa registrada; fallback ou humano</span>';
+  h += `</div><p class="data-cap">A tela do cliente é derivada do estado da etapa. Os textos são ${S}.</p>`;
+  $('out').innerHTML = h;
+}
+
+function renderTrans() {
+  const s = path[cur];
+  let items = s.trans || [];
+  if (s.kind === 'decision') items = s.decision.options.map((o) => (decisions[s.decision.id] === o.v ? '✓ ' : '') + o.label);
+  if (!items.length) {
+    $('trans').innerHTML = s.kind === 'end'
+      ? '<p>Fim deste caminho. Volte a uma decisão (◆), troque um ajuste do código ou carregue outro roteiro para comparar.</p>'
+      : '<p class="none">Nenhuma.</p>';
+    return;
+  }
+  $('trans').innerHTML = '<ul class="trans">' + items.map((t) => `<li>${esc(t)}</li>`).join('') + '</ul>';
+}
+
+/* ───────── ligações ───────── */
+document.querySelectorAll('.seg').forEach((g) => g.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => setCfg(g.dataset.k, b.dataset.v))));
+$('presets').innerHTML = PRESETS.map((p, i) => `<button type="button" data-i="${i}">${esc(p.name)}</button>`).join('');
+$('presets').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => loadPreset(+b.dataset.i)));
+$('btn-play').addEventListener('click', () => (playing ? pause() : play()));
+$('btn-next').addEventListener('click', () => { pause(); next(); });
+$('btn-prev').addEventListener('click', () => { pause(); prev(); });
+$('btn-reset').addEventListener('click', reset);
+$('speed').addEventListener('change', (e) => setSpeed(parseFloat(e.target.value)));
+document.addEventListener('keydown', (e) => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'select' || tag === 'input' || tag === 'textarea') return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); pause(); next(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); pause(); prev(); }
+  else if (e.key === ' ' && tag !== 'button' && tag !== 'a' && tag !== 'li') { e.preventDefault(); playing ? pause() : play(); }
+});
+
+window.__sim = {
+  get cur() { return cur; },
+  get playing() { return playing; },
+  path: () => path,
+  decisions: () => ({ ...decisions }),
+  cfg: () => ({ ...cfg }),
+  goto, next, prev, play, pause, reset, setCfg, loadPreset, buildPath, codeLines,
+  choose: (id, v) => { const s = path.find((p) => p.kind === 'decision' && p.decision.id === id); if (!s) throw new Error('decisão fora do caminho: ' + id); choose(s, v); },
+};
+
+rebuild();
+renderAll();
+</script>
+</body>
+</html>

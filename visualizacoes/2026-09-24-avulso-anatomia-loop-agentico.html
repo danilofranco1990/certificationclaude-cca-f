@@ -1,0 +1,1376 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A seta que volta</title>
+<meta name="description" content="Simulador do loop agêntico: a mesma tarefa de quatro passos com cinco verificadores diferentes, comparando o que o loop acredita com a verdade do ambiente.">
+<style>
+  :root {
+    --ground:  #F6F7F9;
+    --surface: #FFFFFF;
+    --ink:     #15181D;
+    --muted:   #5C6470;
+    --faint:   #A7AEB8;
+    --rule:    #DFE3E9;
+    --accent:  #0F5C57;
+    --code-bg: #EFF1F4;
+    --err:     #B42318;
+    --err-bg:  #FDECEA;
+    --good:    #15803D;
+    --good-bg: #E7F6EC;
+    --warn:    #A15C07;
+    --warn-bg: #FEF3C7;
+    --cli:     #A21C5B;
+    --app:     #0F5C57;
+    --model:   #5B3FBF;
+    --model-bg:#EFEBFB;
+    --tools:   #92400E;
+    --mat:     #1D4ED8;
+    --doc:     #047857;
+    --sim:     #C2410C;
+    --on-fill: #FFFFFF;
+    --hl:      rgba(15, 92, 87, .16);
+    --hl-line: rgba(15, 92, 87, .08);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #101317;
+      --surface: #171B21;
+      --ink:     #E6E9EE;
+      --muted:   #98A2B0;
+      --faint:   #4A525E;
+      --rule:    #2A313B;
+      --accent:  #4FB3A6;
+      --code-bg: #1E242C;
+      --err:     #F87171;
+      --err-bg:  #3A1D1F;
+      --good:    #4ADE80;
+      --good-bg: #16301F;
+      --warn:    #FBBF24;
+      --warn-bg: #3A2E12;
+      --cli:     #F472B6;
+      --app:     #4FB3A6;
+      --model:   #A78BFA;
+      --model-bg:#261F3D;
+      --tools:   #F0A34D;
+      --mat:     #7FA6FF;
+      --doc:     #4ADE80;
+      --sim:     #FB923C;
+      --on-fill: #101317;
+      --hl:      rgba(79, 179, 166, .26);
+      --hl-line: rgba(79, 179, 166, .10);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:  #101317;
+    --surface: #171B21;
+    --ink:     #E6E9EE;
+    --muted:   #98A2B0;
+    --faint:   #4A525E;
+    --rule:    #2A313B;
+    --accent:  #4FB3A6;
+    --code-bg: #1E242C;
+    --err:     #F87171;
+    --err-bg:  #3A1D1F;
+    --good:    #4ADE80;
+    --good-bg: #16301F;
+    --warn:    #FBBF24;
+    --warn-bg: #3A2E12;
+    --cli:     #F472B6;
+    --app:     #4FB3A6;
+    --model:   #A78BFA;
+    --model-bg:#261F3D;
+    --tools:   #F0A34D;
+    --mat:     #7FA6FF;
+    --doc:     #4ADE80;
+    --sim:     #FB923C;
+    --on-fill: #101317;
+    --hl:      rgba(79, 179, 166, .26);
+    --hl-line: rgba(79, 179, 166, .10);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; padding: 16px;
+    background: var(--ground); color: var(--ink);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  code, pre, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, "Courier New", monospace; }
+  code { font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .panel, .warnbox, .sub, .legend, footer, td, th, li, p { overflow-wrap: anywhere; min-width: 0; }
+  h1 { font-size: 1.45rem; line-height: 1.25; margin: 0 0 6px; }
+  h2 { font-size: 1.05rem; margin: 0 0 8px; }
+  h3 { font-size: .95rem; margin: 14px 0 6px; }
+  p { margin: 0 0 10px; }
+  ul, ol { margin: 0 0 10px; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1320px; margin: 0 auto; }
+  .sub { color: var(--muted); margin-bottom: 10px; }
+  .why { font-size: .88rem; color: var(--muted); margin: 0 0 10px; padding: 6px 10px; border-left: 3px solid var(--accent); background: var(--hl-line); border-radius: 4px; }
+  .warnbox { border: 1px dashed var(--sim); border-radius: 8px; padding: 8px 12px; font-size: .9rem; margin: 8px 0 12px; background: var(--surface); }
+
+  .tag { display: inline-block; font-size: .68rem; line-height: 1.4; padding: 0 7px; border-radius: 999px; border: 1px solid; margin-left: 4px; vertical-align: middle; white-space: nowrap; font-family: system-ui, sans-serif; font-weight: 600; text-decoration: none; }
+  .t-mat { color: var(--mat); border-color: var(--mat); }
+  .t-doc { color: var(--doc); border-color: var(--doc); }
+  a.t-doc:hover { background: var(--hl-line); }
+  .t-sim { color: var(--sim); border-color: var(--sim); border-style: dashed; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: .85rem; color: var(--muted); align-items: center; }
+  .legend .tag { margin-left: 0; }
+
+  .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; }
+
+  /* controles */
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 10px; }
+  .btn { font: inherit; font-size: .9rem; padding: 7px 13px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .btn:hover:not(:disabled) { border-color: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.primary { background: var(--accent); color: var(--on-fill); border-color: var(--accent); font-weight: 600; min-width: 104px; }
+  .controls select { font: inherit; font-size: .9rem; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); }
+  .progress { font-size: .88rem; color: var(--muted); margin-left: auto; }
+  .kbd { font-size: .78rem; color: var(--muted); margin: 0 0 12px; }
+  .timeline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
+  .tl { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--rule); background: var(--surface); cursor: pointer; padding: 0; }
+  .tl.past { background: var(--rule); }
+  .tl.cur { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 0 3px var(--hl); }
+  .tl.dec { border-radius: 4px; transform: rotate(45deg); border-color: var(--sim); }
+  .tl.dec.open { border-style: dashed; }
+  .tl.dec.past, .tl.dec.cur { background: var(--sim); border-color: var(--sim); }
+  .tl.fail { border-color: var(--err); }
+  .tl.end { border-radius: 3px; }
+  .tl.end.ok { border-color: var(--good); }
+  .tl.end.bad { border-color: var(--err); }
+  .tl.end.mid { border-color: var(--warn); }
+  .tl-more { font-size: .8rem; color: var(--sim); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .85rem; color: var(--muted); margin-bottom: 12px; min-height: 1.6em; }
+  .chip-dec { font: inherit; font-size: .8rem; padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--sim); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .chip-dec b { color: var(--sim); }
+
+  /* grade */
+  .grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  @media (max-width: 1000px) {
+    .grid { display: flex; flex-direction: column; align-items: stretch; gap: 14px; }
+    .col { display: contents; }
+    #p-step { order: 1; } #p-stage { order: 2; } #p-data { order: 3; } #p-state { order: 4; } #p-trans { order: 5; }
+  }
+
+  /* palco: o loop */
+  .stage-top { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  @media (max-width: 680px) { .stage-top { grid-template-columns: minmax(0, 1fr); } }
+  .where { font-size: .82rem; color: var(--muted); margin: 0 0 8px; }
+  .where b { color: var(--ink); }
+  .cycle { display: grid; grid-template-columns: minmax(0, 1fr) 68px; }
+  .cyc-nodes { display: flex; flex-direction: column; min-width: 0; }
+  .node { border: 2px solid var(--rule); border-radius: 10px; padding: 6px 10px; background: var(--surface); position: relative; min-width: 0; }
+  .node b { display: block; font-family: ui-monospace, Consolas, monospace; font-size: .86rem; }
+  .node small { display: block; color: var(--muted); font-size: .74rem; line-height: 1.35; }
+  .node .nsub { display: block; margin-top: 3px; font-family: ui-monospace, Consolas, monospace; font-size: .72rem; color: var(--accent); min-height: 1.1em; overflow-wrap: anywhere; }
+  .node.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--hl); }
+  .node.n-verify.pending { border-style: dashed; border-color: var(--sim); }
+  .node.n-verify.absent { border-style: dashed; opacity: .55; }
+  .node.n-verify.self { border-color: var(--model); background: var(--model-bg); }
+  .node.n-verify.self.on { box-shadow: 0 0 0 3px var(--model-bg); }
+  .node.n-verify .nsub.fail { color: var(--err); font-weight: 700; }
+  .node.n-verify .nsub.pass { color: var(--good); }
+  .node.n-exit { border-style: dotted; }
+  .node.n-exit.ok { border-color: var(--good); background: var(--good-bg); border-style: solid; }
+  .node.n-exit.bad { border-color: var(--err); background: var(--err-bg); border-style: solid; }
+  .node.n-exit.mid { border-color: var(--warn); background: var(--warn-bg); border-style: solid; }
+  .conn { text-align: center; color: var(--faint); font-size: .76rem; line-height: 1.2; padding: 2px 0; }
+  .conn.skip { color: var(--sim); font-weight: 600; }
+  .rail { border: 3px solid var(--faint); border-left: 0; border-radius: 0 14px 14px 0; margin: 22px 0; position: relative; display: flex; align-items: center; justify-content: center; padding: 4px 4px 4px 6px; min-height: 60px; }
+  .rail::before { content: ""; position: absolute; top: -9px; left: -4px; border: 7px solid transparent; border-right: 9px solid var(--faint); border-left: 0; }
+  .rail span { font-size: .66rem; line-height: 1.25; text-align: center; color: var(--muted); }
+  .rail span b { display: block; font-size: .8rem; color: var(--ink); }
+  .rail.on { border-color: var(--accent); }
+  .rail.on::before { border-right-color: var(--accent); }
+  .rail.on span b { color: var(--accent); }
+  .rail.vazia { border-color: var(--warn); border-style: dashed; border-left: 0; }
+  .rail.vazia::before { border-right-color: var(--warn); }
+  .rail.none { border-color: transparent; }
+  .rail.none::before { display: none; }
+  .rail.none span { color: var(--sim); font-weight: 600; }
+
+  ul.checks { list-style: none; padding: 0; margin: 0; font-size: .84rem; }
+  ul.checks li { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; border-bottom: 1px solid var(--rule); margin: 0; }
+  ul.checks li:last-child { border-bottom: 0; }
+  ul.checks li small { color: var(--muted); display: block; font-size: .76rem; }
+  ul.checks li.chg { background: var(--hl-line); }
+  .lamp { width: 13px; height: 13px; border-radius: 50%; flex: 0 0 13px; margin-top: 4px; background: var(--faint); }
+  li.ok .lamp { background: var(--good); }
+  li.no .lamp { background: var(--err); }
+  li.na .lamp { background: transparent; border: 2px dashed var(--faint); }
+  .checks-t { font-size: .8rem; font-weight: 700; color: var(--muted); margin: 0 0 4px; }
+
+  /* palco: crença x verdade */
+  .board-h { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; align-items: baseline; margin: 16px 0 6px; }
+  .board-h h3 { margin: 0; }
+  .debt { font-size: .8rem; color: var(--muted); }
+  .debt b { color: var(--err); }
+  .debt b.zero { color: var(--good); }
+  .board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .bcol { font-size: .74rem; font-weight: 700; text-align: center; color: var(--muted); padding: 2px 0; border-bottom: 3px solid transparent; }
+  .bcol.cur { color: var(--accent); border-bottom-color: var(--accent); }
+  .brow { grid-column: 1 / -1; font-size: .76rem; color: var(--muted); font-weight: 600; margin-top: 6px; }
+  .brow small { font-weight: 400; }
+  .cell { border: 1px solid var(--rule); border-radius: 8px; padding: 5px 6px; font-size: .72rem; line-height: 1.3; min-height: 46px; background: var(--surface); min-width: 0; overflow-wrap: anywhere; }
+  .cell b { display: block; font-size: .78rem; }
+  .cell small { display: block; color: var(--muted); font-size: .68rem; }
+  .cell .inh { display: block; color: var(--err); font-size: .66rem; font-weight: 700; margin-top: 2px; }
+  .cell.empty { color: var(--faint); border-style: dashed; }
+  .cell.ok { border-color: var(--good); background: var(--good-bg); }
+  .cell.bad { border-color: var(--err); background: var(--err-bg); }
+  .cell.warn { border-color: var(--warn); background: var(--warn-bg); }
+  .cell.self { border-color: var(--model); background: var(--model-bg); }
+  .cell.neutral { border-color: var(--faint); }
+  .cell.chg { box-shadow: 0 0 0 2px var(--accent); }
+  .cell.sig { text-align: center; }
+  @media (max-width: 680px) {
+    .board { gap: 4px; }
+    .cell { padding: 4px 3px; overflow-wrap: break-word; hyphens: auto; }
+    .cell b { font-size: .7rem; }
+    .cell small, .cell .inh { font-size: .62rem; }
+    .bcol { font-size: .68rem; }
+  }
+  .board-note { font-size: .78rem; color: var(--muted); margin: 8px 0 0; }
+
+  /* etapa */
+  .stephead { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+  .stepno { font-weight: 600; }
+  .actor { padding: 1px 9px; border-radius: 999px; color: var(--on-fill); font-weight: 600; font-size: .75rem; }
+  .a-app { background: var(--app); } .a-api { background: var(--model); } .a-tools { background: var(--tools); }
+  .a-voce { background: var(--sim); } .a-cli { background: var(--cli); } .a-none { background: var(--muted); }
+  .flag-dec { color: var(--sim); font-weight: 700; }
+  .explain p { margin-bottom: 8px; }
+  .explain .note { font-size: .88rem; color: var(--muted); }
+  .decision { border: 1px dashed var(--sim); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .dprompt { font-weight: 600; margin-bottom: 8px; }
+  .dopts { display: flex; flex-direction: column; gap: 6px; }
+  .opt { font: inherit; text-align: left; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .opt small { display: block; color: var(--muted); font-size: .8rem; }
+  .opt:hover { border-color: var(--sim); }
+  .opt.sel { border-color: var(--sim); background: var(--hl-line); box-shadow: inset 0 0 0 1px var(--sim); }
+  .opt.sel::before { content: "✓ "; color: var(--sim); font-weight: 700; }
+  .opt code { font-size: .85em; }
+  .dwait { color: var(--sim); font-size: .88rem; margin: 8px 0 0; font-weight: 600; }
+  .dok { color: var(--muted); font-size: .85rem; margin: 8px 0 0; }
+  .verdict { margin-top: 10px; border-radius: 8px; padding: 10px 12px; font-size: .92rem; }
+  .verdict.ok { background: var(--good-bg); border: 1px solid var(--good); }
+  .verdict.bad { background: var(--err-bg); border: 1px solid var(--err); }
+  .verdict.mid { background: var(--warn-bg); border: 1px solid var(--warn); }
+  .verdict b.h { display: block; margin-bottom: 2px; }
+  .verdict.ok b.h { color: var(--good); } .verdict.bad b.h { color: var(--err); } .verdict.mid b.h { color: var(--warn); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 10px; }
+  .metric { border: 1px solid var(--rule); border-radius: 8px; padding: 6px 8px; font-size: .8rem; }
+  .metric span { display: block; color: var(--muted); font-size: .72rem; }
+  .metric b { font-size: .95rem; }
+
+  /* dados */
+  .data-title { font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+  pre.json { background: var(--code-bg); padding: 10px 0; border-radius: 8px; overflow: auto; font-size: .74rem; line-height: 1.5; max-height: 420px; margin: 0; }
+  pre.json .jl { display: block; white-space: pre-wrap; word-break: break-word; padding: 0 12px; }
+  pre.json .jl.hl { background: var(--hl); box-shadow: inset 3px 0 0 var(--accent); }
+  pre.json .k { color: var(--ink); font-weight: 600; }
+  pre.json .s { color: var(--model); }
+  pre.json .n { color: var(--tools); }
+  .term { background: #0E1116; color: #D6DAE0; font-family: ui-monospace, Consolas, monospace; font-size: .74rem; line-height: 1.5; border-radius: 8px; padding: 8px 10px; margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; }
+  .term .ok { color: #4ADE80; } .term .fail { color: #F87171; font-weight: 700; } .term .cmd { color: #93C5FD; } .term .dim { color: #8B95A3; }
+  .term-t { font-size: .76rem; color: var(--muted); margin: 8px 0 0; }
+  .data-cap { font-size: .78rem; color: var(--muted); margin: 8px 0 0; }
+  .ctx { display: flex; flex-direction: column; gap: 5px; }
+  .ci { border: 1px solid var(--rule); border-left-width: 5px; border-radius: 6px; padding: 4px 8px; font-size: .8rem; background: var(--surface); }
+  .ci .ct { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-right: 6px; }
+  .ci.pedido { border-left-color: var(--cli); } .ci.pedido .ct { color: var(--cli); }
+  .ci.arquivo { border-left-color: var(--tools); } .ci.arquivo .ct { color: var(--tools); }
+  .ci.result { border-left-color: var(--app); } .ci.result .ct { color: var(--app); }
+  .ci.texto { border-left-color: var(--model); } .ci.texto .ct { color: var(--model); }
+  .ci.novo { box-shadow: 0 0 0 2px var(--accent); }
+  .ci .nw { font-size: .68rem; font-weight: 700; color: var(--accent); margin-left: 6px; }
+  .ci.desc { opacity: .6; border-style: dashed; }
+  .ci.desc .txt { text-decoration: line-through; }
+  .ci.desc .nw { color: var(--warn); }
+  .ci.fail .txt { color: var(--err); font-weight: 600; }
+
+  /* estado */
+  table.state { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  table.state th, table.state td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  table.state th { color: var(--muted); font-weight: 500; width: 46%; }
+  table.state td.chg { background: var(--hl-line); box-shadow: inset 3px 0 0 var(--accent); }
+
+  ul.trans { list-style: none; padding: 0; margin: 0; }
+  ul.trans li { padding: 5px 0 5px 22px; position: relative; font-size: .9rem; border-bottom: 1px solid var(--rule); margin: 0; }
+  ul.trans li:last-child { border-bottom: 0; }
+  ul.trans li::before { content: "→"; position: absolute; left: 2px; color: var(--accent); font-weight: 700; }
+
+  /* comparação */
+  .cmp { margin-top: 14px; }
+  .cmp-h { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .cmp-h h2 { margin: 0; }
+  .tbl-wrap { overflow-x: auto; }
+  table.cmp-t { width: 100%; border-collapse: collapse; font-size: .82rem; min-width: 760px; }
+  table.cmp-t th, table.cmp-t td { text-align: left; padding: 6px 7px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  table.cmp-t th { color: var(--muted); font-weight: 600; font-size: .76rem; }
+  table.cmp-t tr.cur td { background: var(--hl-line); }
+  table.cmp-t tr.cur td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  table.cmp-t td.hidden { color: var(--faint); font-style: italic; }
+  .pill { display: inline-block; font-size: .72rem; font-weight: 700; padding: 0 7px; border-radius: 999px; }
+  .pill.ok { background: var(--good-bg); color: var(--good); }
+  .pill.bad { background: var(--err-bg); color: var(--err); }
+  .pill.mid { background: var(--warn-bg); color: var(--warn); }
+  .cmp-note { font-size: .8rem; color: var(--muted); margin: 6px 0 0; }
+
+  /* referência */
+  .ref { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 1000px) { .ref { grid-template-columns: 1fr; } }
+  table.ref-t { width: 100%; border-collapse: collapse; font-size: .84rem; margin-bottom: 8px; }
+  table.ref-t th, table.ref-t td { text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  table.ref-t th { color: var(--muted); font-weight: 600; }
+  blockquote { margin: 0 0 8px; padding: 4px 10px; border-left: 3px solid var(--doc); color: var(--muted); font-size: .86rem; }
+  footer { color: var(--muted); font-size: .82rem; margin: 18px 0 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>A seta que volta: anatomia do loop agêntico</h1>
+  <p class="sub">A mesma tarefa de quatro passos (gerar o código, escrever os testes, integrar, publicar), com o mesmo modelo cometendo os mesmos erros. A única coisa que você muda é <b>o passo de verificação</b>. Depois observe o que o loop passa a acreditar e o que de fato está no ambiente. Origem: D1 §1, colado na invocação. Simuladores irmãos: <a href="./2026-09-24-avulso-agent-loop-linha-a-linha.html">agent loop linha a linha</a> (o esqueleto do Módulo 0) e <a href="./2026-09-24-00-fundamentos-ciclo-tool-use.html">ciclo tool_use</a> (o protocolo).</p>
+  <p class="why"><b>Por que esta forma:</b> o conteúdo é um ciclo cuja volta depende de um critério. Por isso o palco é o próprio ciclo, com a seta de volta, e abaixo dele a cadeia de passos em duas linhas, <i>crença</i> e <i>verdade</i>: “o erro compôs em silêncio” é justamente a distância entre elas. O parâmetro que você ajusta é o verificador.</p>
+  <div class="warnbox">🧪 <b>Esta simulação não faz chamadas reais.</b> O cenário (frete grátis), os arquivos, os ids <code>toolu_…</code>, as saídas de terminal e as respostas do modelo foram inventados. O “modelo” segue um roteiro fixo, igual em todos os caminhos. Cada afirmação traz a origem:</div>
+  <div class="legend">
+    <span><span class="tag t-mat">material</span> está no D1 §1 (texto colado e restante da seção)</span>
+    <span><span class="tag t-doc">doc oficial</span> conferido em 2026-09-24; o selo é um link</span>
+    <span><span class="tag t-sim">simulação</span> hipótese do exemplo, não é comportamento garantido</span>
+  </div>
+</header>
+
+<div class="controls" role="toolbar" aria-label="Controles da simulação">
+  <button class="btn primary" id="b-play" type="button">▶ Play</button>
+  <button class="btn" id="b-prev" type="button">◀ Anterior</button>
+  <button class="btn" id="b-next" type="button">Próxima ▶</button>
+  <button class="btn" id="b-reset" type="button">↺ Reiniciar</button>
+  <label class="mono" style="font-size:.85rem;color:var(--muted)">velocidade
+    <select id="speed" aria-label="Velocidade">
+      <option value="0.5">0.5×</option>
+      <option value="1" selected>1×</option>
+      <option value="2">2×</option>
+      <option value="4">4×</option>
+    </select>
+  </label>
+  <span class="progress" id="progress" aria-live="polite"></span>
+</div>
+<p class="kbd">Atalhos: ← → movem uma etapa · espaço = Play/Pausar. O Play para sozinho em cada ◆ decisão. O total de etapas cresce quando você decide.</p>
+<div class="timeline" id="timeline" aria-label="Linha do tempo"></div>
+<div class="chips" id="chips"></div>
+
+<div class="grid">
+  <div class="col">
+    <section class="panel" id="p-stage" aria-label="Palco">
+      <h2>Palco</h2>
+      <div class="stage-top">
+        <div>
+          <p class="where" id="where"></p>
+          <div id="loop"></div>
+        </div>
+        <div>
+          <p class="checks-t">O passo de verificação deste loop…</p>
+          <ul class="checks" id="checks"></ul>
+        </div>
+      </div>
+      <div class="board-h">
+        <h3>Crença × verdade, passo a passo</h3>
+        <span class="debt" id="debt"></span>
+      </div>
+      <div class="board" id="board"></div>
+      <p class="board-note">O loop só enxerga a linha de cima. A de baixo é o ambiente, e só você a vê. A linha do meio é o único caminho pelo qual a verdade chega ao loop, e ela vale apenas o que o verificador mede.</p>
+    </section>
+    <section class="panel" id="p-state" aria-label="Estado">
+      <h2>Estado <small style="font-weight:400;color:var(--muted)">(realce = mudou nesta etapa)</small></h2>
+      <table class="state" id="state"></table>
+    </section>
+  </div>
+  <div class="col">
+    <section class="panel" id="p-step" aria-label="Etapa atual" aria-live="polite">
+      <div class="stephead" id="stephead"></div>
+      <h2 id="steptitle"></h2>
+      <div class="explain" id="explain"></div>
+      <div id="decision"></div>
+    </section>
+    <section class="panel" id="p-data" aria-label="Dados da etapa">
+      <h2>Dados</h2>
+      <div id="data"></div>
+    </section>
+    <section class="panel" id="p-trans" aria-label="Transições possíveis">
+      <h2>Transições a partir daqui</h2>
+      <ul class="trans" id="trans"></ul>
+    </section>
+  </div>
+</div>
+
+<section class="panel cmp" aria-label="Comparação dos desfechos">
+  <div class="cmp-h">
+    <h2>Comparação dos desfechos</h2>
+    <button class="btn" id="b-reveal" type="button">Revelar todos</button>
+  </div>
+  <div class="tbl-wrap"><table class="cmp-t" id="cmp"></table></div>
+  <p class="cmp-note">Cada linha é o mesmo roteiro de modelo com outro verificador. Uma linha aparece quando você chega ao fim daquele caminho, e esta memória sobrevive ao Reiniciar. As linhas saem da mesma função que monta a simulação: não há tabela escrita à mão.</p>
+</section>
+
+<section class="ref" aria-label="Referência">
+  <div class="panel">
+    <h2>Referência técnica</h2>
+    <div class="tbl-wrap">
+    <table class="ref-t">
+      <tr><th>Ponto</th><th>O que vale</th><th>Origem</th></tr>
+      <tr><td>As três fases</td><td>“When you give Claude a task, it works through three phases: <b>gather context</b>, <b>take action</b>, and <b>verify results</b>. These phases blend together.” O diagrama da doc fecha o ciclo: “repeating until task complete”.</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/how-claude-code-works" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td>A seta</td><td>“Each tool use returns information that feeds back into the loop, informing Claude's next decision.”</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/how-claude-code-works" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td>Ground truth</td><td>“it's crucial for the agents to gain ‘ground truth’ from the environment at each step (such as tool call results or code execution) to assess its progress.”</td><td><a class="tag t-doc" href="https://www.anthropic.com/engineering/building-effective-agents" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td>Testes como feedback</td><td>“Code solutions are verifiable through automated tests; Agents can iterate on solutions using test results as feedback.”</td><td><a class="tag t-doc" href="https://www.anthropic.com/engineering/building-effective-agents" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td>O que conta como check</td><td>“anything that returns a signal Claude can read in the conversation: a test suite, a build exit code, a linter, a script that diffs output against a fixture…”. O linter <b>é</b> um check legítimo. O ponto do material é outro: se ele mede a propriedade que a tarefa exige.</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/best-practices" target="_blank" rel="noopener">doc oficial</a> <span class="tag t-mat">material</span></td></tr>
+      <tr><td>Sem check</td><td>“Claude stops when the work looks done. Without a check it can run, ‘looks done’ is the only signal available, and you become the verification loop.”</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/best-practices" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td>Evidência, não afirmação</td><td>“Have Claude show evidence rather than asserting success: the test output, the command it ran and what it returned…”</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/best-practices" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td>Erro composto e parada</td><td>“the potential for compounding errors”; “it's also common to include stopping conditions (such as a maximum number of iterations) to maintain control.”</td><td><a class="tag t-doc" href="https://www.anthropic.com/engineering/building-effective-agents" target="_blank" rel="noopener">doc oficial</a></td></tr>
+      <tr><td>Ferramentas</td><td><code>Bash</code> executa comandos, <code>Edit</code> troca <code>old_string</code> por <code>new_string</code>, <code>Write</code> cria ou sobrescreve arquivos, <code>Read</code> lê.</td><td><a class="tag t-doc" href="https://code.claude.com/docs/en/tools-reference" target="_blank" rel="noopener">doc oficial</a></td></tr>
+    </table>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Erros de interpretação frequentes</h2>
+    <ul>
+      <li><b>“Tem teste, então tem verificação.”</b> Testes que não testam o que importa passam para sempre. No caminho “testes escritos pelo modelo”, o veredito vem do ambiente, mas o critério foi escrito por quem errou <span class="tag t-mat">material</span>.</li>
+      <li><b>“O linter passou, então está verificado.”</b> É um sinal objetivo da propriedade errada: falsa confiança, pior que a ausência declarada. No cenário de prova, a resposta é ligar build e testes ao loop, não mais regras de linter nem outro prompt <span class="tag t-mat">material</span>.</li>
+      <li><b>“Pedir ao modelo que revise o próprio trabalho é verificar.”</b> É auto-relato: o sinal vem do próprio modelo. Confiança declarada não é acurácia <span class="tag t-mat">material</span>. A doc pede evidência em vez de afirmação e, para segunda opinião, que quem faz não seja quem avalia <a class="tag t-doc" href="https://code.claude.com/docs/en/best-practices" target="_blank" rel="noopener">doc oficial</a>.</li>
+      <li><b>“Verificar é rodar o check.”</b> Rodar sem reagir não fecha o ciclo. É preciso “fazer o agente reagir ao resultado” <span class="tag t-mat">material</span>: a falha entra no contexto e muda a próxima ação. Veja o caminho “ignorar”.</li>
+      <li><b>“Mais voltas resolvem.”</b> Repetir sem a informação da falha não cria o sinal que falta <span class="tag t-mat">material</span>. Aqui, o modelo repete o erro <span class="tag t-sim">simulação</span>.</li>
+      <li><b>“Sem sinal objetivo, dê mais autonomia ao agente.”</b> É o contrário. Sem ground truth consultável, o desenho honesto é uma chamada única ou um workflow determinístico <span class="tag t-mat">material</span>.</li>
+    </ul>
+    <h3>O que ficou fora deste recorte</h3>
+    <ul>
+      <li>A definição formal <i>workflow × agente</i> (“predefined code paths” × “dynamically direct their own processes”) e a régua de três perguntas de “Quando usar”. A Question 9 do banco é o caso em que o desenho simples vence.</li>
+      <li>Como tornar o check obrigatório: pedir no prompt, condição de <code>/goal</code>, Stop hook (o D1 §6 trata de hooks) ou subagente verificador. A doc lista os quatro em best practices.</li>
+      <li>O que fazer ao bater o limite de tentativas (escalar com o estado preservado, D1 §8) e calibração de confiança (D5).</li>
+      <li>O formato real das saídas de <code>Bash</code> e o uso de <code>is_error</code>, que não foram modelados. As saídas aqui são ilustrativas.</li>
+      <li>§2 em diante (sessões, subagentes, paralelismo) e o exit code do lab.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <b>Fontes</b> (consultadas em 2026-09-24):
+  <a href="https://code.claude.com/docs/en/how-claude-code-works" target="_blank" rel="noopener">How Claude Code works</a> ·
+  <a href="https://code.claude.com/docs/en/best-practices" target="_blank" rel="noopener">Best practices for Claude Code</a> ·
+  <a href="https://code.claude.com/docs/en/tools-reference" target="_blank" rel="noopener">Tools reference</a> ·
+  <a href="https://www.anthropic.com/engineering/building-effective-agents" target="_blank" rel="noopener">Building effective agents</a>.
+  Material: <code>dominios/01-agentic-architecture/notas.md</code> §1 (não alterado). Arquivo autônomo: sem dependências e sem requisições externas; os links só abrem se você clicar.
+</footer>
+
+</div>
+
+<noscript><p class="warnbox">Este simulador precisa de JavaScript.</p></noscript>
+
+<script>
+'use strict';
+
+/* ---------- origens ---------- */
+const DOC = {
+  hcw: 'https://code.claude.com/docs/en/how-claude-code-works',
+  bp: 'https://code.claude.com/docs/en/best-practices',
+  tools: 'https://code.claude.com/docs/en/tools-reference',
+  bea: 'https://www.anthropic.com/engineering/building-effective-agents',
+};
+const M = '<span class="tag t-mat" title="Está no material: D1 §1">material</span>';
+const S = '<span class="tag t-sim" title="Hipótese criada para o exemplo; não é comportamento garantido">simulação</span>';
+const D = (k) => `<a class="tag t-doc" href="${DOC[k]}" target="_blank" rel="noopener" title="${DOC[k]} · consultado em 2026-09-24">doc oficial</a>`;
+
+/* ---------- domínio ---------- */
+const NOME = { P1: 'gerar o código', P2: 'escrever os testes', P3: 'integrar', P4: 'publicar' };
+const CURTO = { P1: 'P1 gerar', P2: 'P2 testes', P3: 'P3 integrar', P4: 'P4 publicar' };
+const VER = {
+  nenhum:        { rot: 'Nenhum (linha reta)', fonte: '—', mede: '—', cmd: null },
+  autorrelato:   { rot: 'Perguntar ao próprio modelo', fonte: 'o próprio modelo', mede: 'a opinião do modelo sobre o próprio trabalho', cmd: null },
+  linter:        { rot: 'Linter', fonte: 'ambiente', mede: 'estilo do código', cmd: 'npx eslint src' },
+  testes_modelo: { rot: 'Testes escritos pelo modelo', fonte: 'ambiente (critério escrito pelo modelo)', mede: 'os casos que o modelo escolheu: 50 e 500', cmd: 'npm test' },
+  aceite:        { rot: 'Build + casos da spec', fonte: 'ambiente', mede: 'a regra da spec, com o limite de R$ 200', cmd: 'npm run build && npm run aceite' },
+};
+const REA = {
+  corrigir: 'devolver a falha ao contexto e corrigir',
+  repetir: 'descartar a saída e repetir às cegas',
+  ignorar: 'registrar como aviso e seguir',
+};
+const CODE = {
+  checkout0: 'const pagar = carrinho.total;',
+  checkout1: 'const pagar = carrinho.total + frete(carrinho.total);',
+  freteOk: 'export const frete = (total) => total >= 200 ? 0 : 15;',
+  freteBug: "import { acimaDe } from './utils.js';\nexport const frete = (total) => acimaDe(total, 200) ? 0 : 15;",
+  testes2: "test('pedido pequeno paga frete', () => expect(frete(50)).toBe(15));\ntest('pedido grande tem frete grátis', () => expect(frete(500)).toBe(0));",
+  testeLimite: "test('R$ 200,00 exatos têm frete grátis', () => expect(frete(200)).toBe(0));",
+};
+const OUT = {
+  aceiteOk:   ['build ok', '✓ frete(199.99) → 15', '✓ frete(200) → 0', '✓ frete(350) → 0', '3 passed · exit code 0'],
+  aceiteFail: ['build ok', '✓ frete(199.99) → 15', '✕ frete(200) → esperado 0, recebido 15', '✓ frete(350) → 0', '1 failed, 2 passed · exit code 1'],
+  lint:       ['0 problems · exit code 0'],
+  test2:      ['✓ pedido pequeno paga frete', '✓ pedido grande tem frete grátis', '2 passed · exit code 0'],
+  deploy:     ['build ok', 'deploy → produção v1.4.0'],
+};
+
+const clone = (x) => JSON.parse(JSON.stringify(x));
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function initState() {
+  return {
+    passo: null, fase: 'visão geral', volta: 0, tentativa: 0,
+    verificador: null, reacao: null,
+    ctx: [],
+    crenca:  { P1: null, P2: null, P3: null, P4: null },
+    sinal:   { P1: null, P2: null, P3: null, P4: null },
+    verdade: { P1: null, P2: null, P3: null, P4: null },
+    seta: 0, setaVazia: 0, herdaram: 0,
+    defeito: null, publicado: null, detectado: null, confianca: null,
+    desfecho: null,
+    lp: { on: null, a: '', v: '', vres: null, rail: null, exit: 'próximo passo · ou tarefa completa', exitCls: '' },
+  };
+}
+
+/* ---------- construção pura do caminho ---------- */
+function buildPath(dec) {
+  const steps = [];
+  let n = 0;
+  const nid = (suf) => 'toolu_' + String(++n).padStart(2, '0') + suf;
+  const st = initState();
+  let seen = [];
+  const add = (s) => { s.index = steps.length; s.state = clone(st); steps.push(s); return s; };
+  const decision = (s, apply) => {
+    const v = dec[s.decision.id];
+    s.decision.value = v === undefined ? null : v;
+    if (v !== undefined && apply) apply(v);
+    add(s);
+    return v !== undefined;
+  };
+  const ctxSet = (id, t, txt, extra) => {
+    const item = Object.assign({ id, t, txt }, extra || {});
+    const i = st.ctx.findIndex((c) => c.id === id);
+    if (i >= 0) st.ctx[i] = item; else st.ctx.push(item);
+  };
+  const ctxView = (title, cap) => {
+    const sig = (c) => c.id + '|' + c.txt + '|' + (c.desc ? 1 : 0);
+    const novos = st.ctx.filter((c) => !seen.includes(sig(c))).map((c) => c.id);
+    seen = st.ctx.map(sig);
+    return { kind: 'ctx', title, ctx: clone(st.ctx), novos, cap };
+  };
+  const V = dec.verificador;
+  const R = dec.reacao;
+  const bug = () => st.defeito !== null;
+
+  /* ===== 0. visão geral ===== */
+  add({
+    kind: 'info', title: 'Visão geral: a mesma tarefa, cinco verificadores', actors: ['none'],
+    explain: `
+      <p><b>A tarefa</b>, inventada para o exemplo ${S}: o frete do checkout. É grátis a partir de R$ 200,00 e custa R$ 15,00 abaixo disso. O pedido já traz três casos da spec, escritos pelo time: <code>frete(199.99) → 15</code>, <code>frete(200) → 0</code> e <code>frete(350) → 0</code>.</p>
+      <p><b>Os quatro passos</b> são os do material: gerar o código, escrever os testes, integrar e publicar ${M}. Cada passo é uma volta do loop <i>gather context → take action → verify results</i> ${D('hcw')}.</p>
+      <p><b>Onde o modelo erra neste roteiro:</b> no passo 2, os testes não testam o que importa ${M}. No passo 3, ao integrar, ele reusa o helper <code>acimaDe()</code> do projeto, que compara com <code>&gt;</code> ${S}. O roteiro do modelo é o mesmo em todos os caminhos. Só muda o verificador.</p>
+      <p><b>Como ler o palco:</b> em cima está o loop, com a seta que volta. Embaixo está a cadeia em duas linhas: o que o loop <i>acredita</i> e a <i>verdade do ambiente</i>. Só você vê a de baixo. O loop fica sabendo apenas do que um verificador trouxer para cima.</p>
+      <p class="note">O que este simulador precisa provar: a seta que volta é o agente, e ela só funciona quando um sinal do ambiente, que mede o que importa, entra no contexto da volta seguinte.</p>`,
+    data: { kind: 'json', title: 'O cenário (tudo inventado para o exemplo)', obj: {
+      pedido: 'Frete grátis a partir de R$ 200,00; abaixo disso, R$ 15,00. Publique quando pronto.',
+      casos_da_spec: ['frete(199.99) → 15', 'frete(200) → 0', 'frete(350) → 0'],
+      ja_existe_no_projeto: { 'src/checkout.js': CODE.checkout0, 'src/utils.js': 'export const acimaDe = (v, lim) => v > lim;' },
+      passos: ['P1 gerar o código', 'P2 escrever os testes', 'P3 integrar', 'P4 publicar'],
+    }, hl: ['~frete(200) → 0', '~acimaDe'] },
+    trans: ['Próxima etapa: você escolhe o passo de verificação. O Play para lá.'],
+  });
+
+  /* ===== 1. decisão: verificador ===== */
+  st.fase = 'decisão de desenho';
+  const d1 = {
+    kind: 'decision', title: 'Você escolhe: qual é o passo de verificação?', actors: ['voce'],
+    explain: `
+      <p>O roteiro para aqui até você escolher. É a escolha de desenho que a prova cobra: <b>o que confere cada volta?</b> Todas as opções, menos a primeira, põem “um passo depois da ação”. O que as separa é <b>de onde vem o sinal</b> e <b>o que ele mede</b>.</p>
+      <p class="note">Percorra mais de uma. A tabela <i>Comparação dos desfechos</i>, abaixo, ganha uma linha ao fim de cada caminho.</p>`,
+    data: { kind: 'json', title: 'Configuração do loop', obj: { verificador: null }, hl: ['verificador'] },
+    trans: ['Cada opção gera um caminho diferente. Voltar aqui e trocar a escolha descarta o caminho anterior.'],
+    decision: { id: 'verificador', prompt: 'Depois de cada ação, o loop confere o resultado com…', options: [
+      { v: 'nenhum', l: 'Nada: cada passo segue direto para o próximo', s: 'a linha reta de prompts encadeados' },
+      { v: 'autorrelato', l: 'O próprio modelo: “revise e diga se está certo”', s: 'o sinal vem do modelo' },
+      { v: 'linter', l: 'Linter: <code>npx eslint src</code>', s: 'sinal do ambiente; mede estilo' },
+      { v: 'testes_modelo', l: 'Os testes que o modelo escrever no passo 2: <code>npm test</code>', s: 'sinal do ambiente; casos escolhidos pelo modelo' },
+      { v: 'aceite', l: 'Build + casos da spec: <code>npm run build &amp;&amp; npm run aceite</code>', s: 'sinal do ambiente; mede a regra pedida, com o limite' },
+    ] },
+  };
+  if (!decision(d1, (v) => {
+    st.verificador = v;
+    d1.data = { kind: 'json', title: 'Configuração do loop', obj: { verificador: v, comando: VER[v].cmd, fonte_do_sinal: VER[v].fonte, mede: VER[v].mede }, hl: ['verificador', 'fonte_do_sinal', 'mede'] };
+    if (v === 'nenhum') st.lp.exit = 'segue direto para o próximo passo';
+  })) return steps;
+
+  /* ---------- verify genérico ---------- */
+  function verify(p, extra) {
+    st.fase = 'verify results';
+    st.lp.on = 'v';
+    extra = extra || {};
+    const next = p === 'P4' ? 'tarefa completa' : `passou → ${CURTO['P' + (+p[1] + 1)]}`;
+    if (V === 'autorrelato') {
+      const conf = { P1: '95%', P2: '95%', P3: '96%', P4: '97%' }[p];
+      const fala = {
+        P1: 'Revisei src/frete.js: implementa a regra da spec. Confiança: 95%.',
+        P2: 'Os testes cobrem o pedido pequeno e o grande. Confiança: 95%.',
+        P3: 'Integrei usando o helper do projeto, sem duplicar lógica. Confiança: 96%.',
+        P4: 'Publicado. O frete segue a spec. Confiança: 97%.',
+      }[p];
+      st.confianca = conf;
+      st.crenca[p] = { cls: 'ok', b: '✓ “está certo”', s: `por: o próprio modelo · ${conf}` };
+      st.sinal[p] = { cls: 'self', b: '↺ modelo sobre si', s: 'não sai do contexto' };
+      ctxSet('v' + p, 'texto', `autoavaliação do ${p}: “${fala}”`);
+      st.lp.v = `“está certo” · ${conf}`; st.lp.vres = 'pass'; st.lp.exit = next;
+      const EX = {
+        P1: `<p>O loop pede ao modelo que revise o próprio passo. A resposta é mais uma geração do mesmo modelo: a conferência nunca sai do contexto ${M}. Aqui o código está certo, então o relato acertou. Foi por coincidência, não por conferência: ele diria o mesmo se o código estivesse errado.</p><p>Confiança declarada não é acurácia ${M}. A doc pede o oposto: que Claude mostre evidência (a saída do teste, o comando e o que ele devolveu) em vez de afirmar sucesso ${D('bp')}.</p>`,
+        P2: `<p>O modelo avalia os testes que ele mesmo escreveu, com o mesmo ponto cego que os produziu. Se não pensou no limite ao escrever, não vai pensar ao revisar ${S}. Para uma segunda opinião, a doc sugere que quem faz o trabalho não seja quem o avalia ${D('bp')}.</p>`,
+        P3: `<p>“Integrei usando o helper do projeto.” O relato descreve o que foi <i>feito</i>, não o que foi <i>conferido</i>, e soa ainda mais convincente que antes ${S}. Na linha de baixo do palco, o P3 está vermelho. Na de cima, verde. Isso é o erro em silêncio ${M}.</p>`,
+        P4: `<p>Confiança de 97% sobre um conjunto que tem um bug em produção. Sem sinal objetivo, “verify results” vira “pergunte ao modelo se ele acha que acertou”: auto-relato, não verificação ${M}.</p>`,
+      };
+      return add({ kind: 'step', phase: 'v', passo: p, title: `${p} · verify results: o modelo avalia o próprio trabalho`, actors: ['modelo'],
+        explain: EX[p],
+        data: { kind: 'json', title: 'A “verificação”: um pedido de texto e uma resposta de texto, sem ferramenta', obj: [
+          { role: 'user', content: [{ type: 'text', text: 'Revise o passo e diga se está correto.' }] },
+          { role: 'assistant', content: [{ type: 'text', text: fala }] },
+        ], hl: ['text'], cap: `Nenhum <code>tool_use</code>: o sinal nasce e morre no modelo. Textos: ${S}` },
+        trans: [p === 'P4' ? 'Fim do turno: a tarefa é declarada completa.' : `“Passou”: segue para o gather context do ${'P' + (+p[1] + 1)}.`, 'A seta que volta nunca dispara: este verificador não reprova.'],
+      });
+    }
+    if (V === 'linter') {
+      const id = nid('LNT');
+      st.crenca[p] = { cls: 'ok', b: '✓ aprovado', s: 'por: lint · 0 problems' };
+      st.sinal[p] = { cls: 'warn', b: '▲ 0 problems', s: 'mede estilo' };
+      ctxSet('v' + p, 'result', `tool_result ${id}: eslint → 0 problems`);
+      st.lp.v = 'eslint → 0 problems'; st.lp.vres = 'pass'; st.lp.exit = next;
+      const EX = {
+        P1: `<p>O modelo pede <code>Bash</code> com o linter. O harness executa, e o ambiente responde <code>0 problems</code>. É um sinal objetivo, que o modelo não controla ${M}, e a doc inclui o linter entre os checks possíveis ${D('bp')}. A pergunta que decide é outra: <b>o que</b> ele mede? Estilo. Aqui passou, e o código também está certo: coincidência de dois “sim”.</p>`,
+        P2: `<p><code>0 problems</code>. O linter olha a forma dos testes, não o que eles cobrem. A lacuna do P2 é invisível para ele.</p>`,
+        P3: `<p><code>0 problems</code>: o código pode até ter ficado mais limpo com o helper. É verde sobre um bug, o caso mais traiçoeiro: o loop “tem” verificação, e o erro passa por um portão que olhava para o outro lado ${M}.</p>`,
+        P4: `<p>Verde em todas as voltas. É o cenário de prova da §1: o pipeline gera, passa no linter e publica o que não funciona ${M}. O conserto não é pôr mais regras no linter nem trocar o prompt. É <b>trocar o critério</b> ${M}.</p>`,
+      };
+      return add({ kind: 'step', phase: 'v', passo: p, title: `${p} · verify results: lint`, actors: ['modelo', 'harness', 'ambiente'],
+        explain: EX[p],
+        data: { kind: 'json', title: 'verify results: o pedido do modelo e a resposta do ambiente', obj: [
+          { role: 'assistant', content: [{ type: 'tool_use', id, name: 'Bash', input: { command: VER.linter.cmd } }] },
+          { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: OUT.lint.join('\n') }] },
+        ], hl: ['id', 'tool_use_id', '~0 problems'], term: { cmd: VER.linter.cmd, lines: OUT.lint } },
+        trans: [p === 'P4' ? 'Passou: tarefa declarada completa.' : `Passou: segue para o gather context do ${'P' + (+p[1] + 1)}.`, 'A seta que volta nunca dispara: o linter não acusa nada nesta tarefa.'],
+      });
+    }
+    if (V === 'testes_modelo') {
+      if (p === 'P1') {
+        st.crenca[p] = { cls: 'ok', b: '✓ assumido', s: 'nenhum teste ainda' };
+        st.sinal[p] = { cls: 'empty', b: '— sem testes', s: 'nada a rodar' };
+        st.lp.v = 'sem testes: nada a rodar'; st.lp.vres = null; st.lp.exit = next;
+        return add({ kind: 'step', phase: 'v', passo: p, title: 'P1 · verify results: ainda não há testes', actors: ['harness'],
+          explain: `<p>O verificador escolhido é a suíte que o próprio modelo vai escrever no passo 2. No passo 1 ela não existe: não há o que rodar, e o passo segue sem conferência ${S}. Repare: o critério deste loop depende de uma saída do mesmo modelo que ele deveria conferir.</p>`,
+          data: { kind: 'json', title: 'Estado do verificador', obj: { verificador: 'npm test', testes_existentes: 0, resultado: 'nada a executar: o passo segue' }, hl: ['testes_existentes'] },
+          trans: ['Segue para o gather context do P2.'],
+        });
+      }
+      const id = nid('TST');
+      st.crenca[p] = { cls: 'ok', b: '✓ aprovado', s: 'por: npm test · 2 passed' };
+      st.sinal[p] = { cls: 'warn', b: '▲ 2 passed', s: 'casos 50 e 500' };
+      ctxSet('v' + p, 'result', `tool_result ${id}: npm test → 2 passed`);
+      st.lp.v = 'npm test → 2 passed'; st.lp.vres = 'pass'; st.lp.exit = next;
+      const EX = {
+        P2: `<p>Agora há o que rodar: <code>2 passed</code>. O veredito vem do ambiente ${M}, mas os casos, isto é, o critério, foram escolhidos pelo mesmo modelo. O teste que importava (R$ 200) não pode falhar, porque não existe ${M}.</p>`,
+        P3: `<p><code>2 passed</code> de novo: 50 não passa de 200, e 500 passa. O bug mora exatamente no caso que os testes não cobrem. <b>Nada acusa</b> ${M}. “Tem teste” não é o mesmo que “verifica o que importa”.</p>`,
+        P4: `<p>Todos os testes passaram, os dois que não testam o que importa. O passo 4 publicou o conjunto ${M}.</p>`,
+      };
+      return add({ kind: 'step', phase: 'v', passo: p, title: `${p} · verify results: os testes do próprio modelo`, actors: ['modelo', 'harness', 'ambiente'],
+        explain: EX[p],
+        data: { kind: 'json', title: 'verify results: o pedido do modelo e a resposta do ambiente', obj: [
+          { role: 'assistant', content: [{ type: 'tool_use', id, name: 'Bash', input: { command: VER.testes_modelo.cmd } }] },
+          { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: OUT.test2.join('\n') }] },
+        ], hl: ['id', 'tool_use_id', '~2 passed'], term: { cmd: VER.testes_modelo.cmd, lines: OUT.test2 } },
+        trans: [p === 'P4' ? 'Passou: tarefa declarada completa.' : `Passou: segue para o gather context do ${'P' + (+p[1] + 1)}.`, 'A seta nunca dispara: os testes não cobrem o caso que quebrou.'],
+      });
+    }
+    /* aceite */
+    const falha = bug();
+    const cmd = p === 'P4' ? 'npm run aceite -- --alvo=producao' : VER.aceite.cmd;
+    const out = falha ? OUT.aceiteFail : OUT.aceiteOk;
+    const id = nid('ACT');
+    const tent = extra.tent ? ` (${extra.tent}ª tentativa)` : '';
+    if (falha) {
+      st.crenca[p] = { cls: 'bad', b: '✗ reprovado', s: 'frete(200) → 15' + tent };
+      st.sinal[p] = { cls: 'bad', b: '▲ 1 failed', s: 'mede a regra' };
+      ctxSet('v' + p, 'result', `tool_result ${id}: 1 failed, frete(200) → esperado 0, recebido 15`, { fail: true });
+      st.lp.v = (p === 'P4' ? 'aceite (produção)' : 'aceite') + ' → 1 failed'; st.lp.vres = 'fail';
+      st.lp.exit = 'o passo não avança';
+      if (!st.detectado) st.detectado = `${p}, na volta ${st.volta}`;
+    } else {
+      st.crenca[p] = { cls: 'ok', b: '✓ aprovado', s: 'por: casos da spec' + tent };
+      st.sinal[p] = { cls: 'ok', b: '▲ 3 passed', s: 'mede a regra' };
+      ctxSet('v' + p, 'result', `tool_result ${id}: 3 passed`);
+      st.lp.v = (p === 'P4' ? 'aceite (produção)' : 'aceite') + ' → 3 passed'; st.lp.vres = 'pass'; st.lp.exit = next;
+    }
+    if (p === 'P4' && !falha) { st.lp.exitCls = 'ok'; }
+    return add({ kind: 'step', phase: 'v', passo: p, fail: falha, title: `${p} · verify results: build + casos da spec${tent}`, actors: ['modelo', 'harness', 'ambiente'],
+      explain: extra.explain,
+      data: { kind: 'json', title: 'verify results: o pedido do modelo e a resposta do ambiente', obj: [
+        { role: 'assistant', content: [{ type: 'tool_use', id, name: 'Bash', input: { command: cmd } }] },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: out.join('\n') }] },
+      ], hl: ['id', 'tool_use_id', falha ? '~esperado 0' : '~3 passed'], term: { cmd, lines: out } },
+      trans: extra.trans,
+    });
+  }
+
+  /* ---------- gather ---------- */
+  function gather(p, title, explain, actors) {
+    st.passo = p; st.fase = 'gather context'; st.volta += 1;
+    st.lp.on = 'g'; st.lp.rail = null; st.lp.exitCls = '';
+    return add({ kind: 'step', phase: 'g', passo: p, title, actors: actors || ['harness', 'modelo'], explain,
+      data: ctxView(`O que o modelo recebe na volta ${st.volta}`, 'Realce = entrou no contexto desde a volta anterior. Contexto resumido: a mensagem real traz o histórico inteiro. ' + S),
+      trans: ['take action: com este contexto, o modelo decide o próximo pedido de ferramenta.'] });
+  }
+
+  const afterAction = (p) => V === 'nenhum'
+    ? [p === 'P4' ? 'Sem verify: o turno termina quando o modelo acha que acabou (end_turn).' : `Sem verify: segue direto para o gather context do ${'P' + (+p[1] + 1)}.`]
+    : [`verify results: ${VER[V].rot}.`];
+  const semVer = (p) => {
+    if (V !== 'nenhum') return;
+    st.crenca[p] = { cls: 'ok', b: '✓ assumido', s: 'nada disse o contrário' };
+    st.sinal[p] = { cls: 'empty', b: '— sem sinal', s: 'nada é conferido' };
+    st.lp.v = ''; st.lp.vres = null;
+  };
+
+  /* ===== P1 ===== */
+  st.tentativa = 1;
+  ctxSet('pedido', 'pedido', 'Frete grátis a partir de R$ 200,00; abaixo, R$ 15,00. Casos da spec: frete(199.99) → 15 · frete(200) → 0 · frete(350) → 0.');
+  ctxSet('checkout', 'arquivo', 'src/checkout.js: ' + CODE.checkout0 + ' (lido com Read)');
+  gather('P1', 'P1 · gather context: a primeira volta',
+    `<p>O harness monta o que o modelo vê nesta volta: o pedido, com os casos da spec, e o <code>src/checkout.js</code>, que o modelo pediu com <code>Read</code> ${S}. Claude Code é a camada em volta do modelo que fornece as ferramentas e administra o contexto que ele vê ${D('hcw')}.</p><p>Ainda não há <code>tool_result</code> anterior: esta é a primeira volta.</p>`);
+
+  st.fase = 'take action'; st.lp.on = 'a';
+  const w1 = nid('WRT');
+  st.verdade.P1 = { cls: 'ok', b: 'ok', s: 'total >= 200' };
+  ctxSet('frete', 'arquivo', 'src/frete.js: ' + CODE.freteOk);
+  st.lp.a = 'Write src/frete.js';
+  semVer('P1');
+  if (V === 'nenhum') st.lp.exit = 'segue direto → P2 gather';
+  add({ kind: 'step', phase: 'a', passo: 'P1', title: 'P1 · take action: gerar o código', actors: ['modelo', 'harness', 'ambiente'],
+    explain: `<p>O modelo decide e pede <code>Write</code>. Quem executa é o harness, e o arquivo passa a existir no ambiente ${M}. O código sai certo: <code>total &gt;= 200</code> ${S}.</p>${V === 'nenhum' ? `<p class="note">Sem passo de verificação, a linha de cima do palco já marca o P1 como “assumido”: ninguém disse que estava errado.</p>` : ''}`,
+    data: { kind: 'json', title: 'take action: o pedido do modelo e a resposta do harness', obj: [
+      { role: 'assistant', content: [{ type: 'tool_use', id: w1, name: 'Write', input: { file_path: 'src/frete.js', content: CODE.freteOk } }] },
+      { role: 'user', content: [{ type: 'tool_result', tool_use_id: w1, content: 'File created: src/frete.js' }] },
+    ], hl: ['id', 'tool_use_id', '~total >= 200'] },
+    trans: afterAction('P1') });
+
+  if (V !== 'nenhum') verify('P1', {
+    explain: `<p>O modelo pede <code>Bash</code> com o build e os casos da spec. O harness executa, e o ambiente responde. Os três casos passam, inclusive o limite <code>frete(200) → 0</code>. É um sinal que o modelo não controla ${M} e que mede a propriedade pedida. A doc chama isso de dar critério de verificação: casos de exemplo e “rode os testes depois de implementar” ${D('bp')}.</p>`,
+    trans: ['Passou: segue para o gather context do P2.', 'Se tivesse falhado, a seta levaria a falha para a próxima volta.'],
+  });
+
+  /* ===== P2 ===== */
+  st.tentativa = 1;
+  gather('P2', 'P2 · gather context: o que a volta anterior deixou',
+    `<p>Volta 2. Entrou no contexto o <code>src/frete.js</code> que o modelo escreveu${V !== 'nenhum' && V !== 'testes_modelo' ? ', junto com o resultado da verificação da volta anterior' : ''}. É com isso que o modelo decide o passo seguinte: cada uso de ferramenta devolve informação que alimenta o loop ${D('hcw')}.</p>` +
+    (V === 'nenhum' ? `<p>Nenhum item do contexto diz se o <code>frete.js</code> está certo. Ele entra como premissa boa porque nada disse o contrário ${M}.</p>` : '') +
+    (V === 'autorrelato' ? `<p>O item de “verificação” no contexto é texto do próprio modelo: ele confirma a si mesmo.</p>` : '') +
+    (V === 'testes_modelo' ? `<p>Não há resultado de verificação no contexto: no P1 não havia testes para rodar.</p>` : ''));
+
+  st.fase = 'take action'; st.lp.on = 'a';
+  const w2 = nid('WRT');
+  st.verdade.P2 = { cls: 'warn', b: 'lacuna', s: 'não testa R$ 200' };
+  ctxSet('teste', 'arquivo', 'src/frete.test.js: 2 testes, 50 → 15 e 500 → 0');
+  st.lp.a = 'Write src/frete.test.js';
+  semVer('P2');
+  if (V === 'nenhum') st.lp.exit = 'segue direto → P3 gather';
+  add({ kind: 'step', phase: 'a', passo: 'P2', title: 'P2 · take action: escrever os testes', actors: ['modelo', 'harness', 'ambiente'],
+    explain: `<p>O modelo escreve dois testes: <code>frete(50) → 15</code> e <code>frete(500) → 0</code>. Os dois passam, e nenhum toca no limite de R$ 200, que é o caso da regra. <b>Os testes não testam o que importa. Nada acusa.</b> ${M}</p><p class="note">No palco, a verdade do P2 fica amarela (lacuna). A crença ainda não mudou: ninguém sabe.</p>`,
+    data: { kind: 'json', title: 'take action: o pedido do modelo e a resposta do harness', obj: [
+      { role: 'assistant', content: [{ type: 'tool_use', id: w2, name: 'Write', input: { file_path: 'src/frete.test.js', content: CODE.testes2 } }] },
+      { role: 'user', content: [{ type: 'tool_result', tool_use_id: w2, content: 'File created: src/frete.test.js' }] },
+    ], hl: ['id', 'tool_use_id', '~frete(50)'] },
+    trans: afterAction('P2') });
+
+  if (V !== 'nenhum') verify('P2', {
+    explain: `<p><code>3 passed</code>. Os casos da spec continuam passando, porque o código não mudou. A lacuna dos testes do modelo não é acusada, e não precisa ser: o critério deste loop não depende deles. Ela só custaria caro se fosse a rede de segurança.</p>`,
+    trans: ['Passou: segue para o gather context do P3.'],
+  });
+
+  /* ===== P3 ===== */
+  st.tentativa = 1;
+  ctxSet('utils', 'arquivo', 'src/utils.js: export const acimaDe = (v, lim) => v > lim; (lido com Read)');
+  st.herdaram += 1;
+  st.verdade.P3 = { cls: 'empty', b: '·', s: 'ainda não integrado', inh: 'herdou: lacuna do P2' };
+  const crencaP2 = V === 'nenhum' ? 'assumidos como bons' : V === 'autorrelato' ? 'aprovados pelo próprio modelo' : V === 'linter' ? 'aprovados pelo lint' : V === 'testes_modelo' ? 'verdes (2 passed)' : 'lado a lado com os casos da spec, que passaram';
+  gather('P3', 'P3 · gather context: a lacuna vira premissa',
+    `<p>Volta 3. Para integrar, o modelo lê <code>src/utils.js</code> e encontra o helper <code>acimaDe()</code> ${S}. Os testes do P2 estão no contexto, ${crencaP2}. <b>O passo 3 constrói sobre o 2</b> ${M}: a lacuna vira premissa. A célula da verdade do P3 já mostra a herança.</p>`);
+
+  const p3action = (tent) => {
+    st.fase = 'take action'; st.lp.on = 'a'; st.lp.rail = null;
+    const e1 = nid('EDT'), e2 = nid('EDT');
+    st.verdade.P3 = { cls: 'bad', b: 'bug', s: 'acimaDe usa >: R$ 200 paga 15', inh: 'herdou: lacuna do P2' };
+    st.defeito = 'P3: acimaDe(total, 200) cobra frete em R$ 200,00';
+    ctxSet('frete', 'arquivo', 'src/frete.js: frete = (total) => acimaDe(total, 200) ? 0 : 15');
+    ctxSet('checkout', 'arquivo', 'src/checkout.js: ' + CODE.checkout1);
+    st.lp.a = 'Edit src/frete.js · Edit src/checkout.js';
+    semVer('P3');
+    if (V === 'nenhum') st.lp.exit = 'segue direto → P4 gather';
+    return add({ kind: 'step', phase: 'a', passo: 'P3', title: `P3 · take action: integrar${tent ? ` (${tent}ª tentativa)` : ''}`, actors: ['modelo', 'harness', 'ambiente'],
+      explain: tent
+        ? `<p>Mesma entrada, mesma tendência: o simulador supõe que o modelo repete o helper ${S}. Na prática, uma nova amostra até pode acertar por sorte, mas nada no contexto a empurra para isso. Mais iterações não criam o sinal que falta ${M}.</p>`
+        : `<p>O modelo pede duas edições no mesmo turno. No checkout, passa a somar o frete. No <code>frete.js</code>, troca a comparação pelo helper do projeto: <code>acimaDe(total, 200)</code>. Parece boa prática, mas o helper compara com <code>&gt;</code>, e um carrinho de exatamente R$ 200,00 agora paga frete ${S}. O modelo é probabilístico e fornece matéria-prima para o erro com fluência total ${M}.</p>`,
+      data: { kind: 'json', title: 'take action: dois tool_use no mesmo turno, dois tool_result na resposta', obj: [
+        { role: 'assistant', content: [
+          { type: 'tool_use', id: e1, name: 'Edit', input: { file_path: 'src/checkout.js', old_string: CODE.checkout0, new_string: CODE.checkout1 } },
+          { type: 'tool_use', id: e2, name: 'Edit', input: { file_path: 'src/frete.js', old_string: CODE.freteOk, new_string: CODE.freteBug } },
+        ] },
+        { role: 'user', content: [
+          { type: 'tool_result', tool_use_id: e1, content: 'The file src/checkout.js has been updated.' },
+          { type: 'tool_result', tool_use_id: e2, content: 'The file src/frete.js has been updated.' },
+        ] },
+      ], hl: ['id', 'tool_use_id', '~acimaDe(total, 200)'] },
+      trans: afterAction('P3') });
+  };
+  p3action(0);
+
+  if (V !== 'nenhum') {
+    if (V === 'aceite') {
+      verify('P3', {
+        explain: `<p>O ambiente responde: <code>frete(200)</code> esperado 0, recebido 15. O erro aparece como teste vermelho ${M}, <b>no mesmo passo em que nasceu</b>, antes de qualquer coisa ser construída em cima dele.</p><p>Isso ainda não é a seta. A seta é a falha voltar para o contexto e mudar a próxima ação. Na próxima etapa, você decide a reação.</p>`,
+        trans: ['Falhou: o loop precisa decidir o que fazer com o resultado. Na próxima etapa, a decisão é sua.'],
+      });
+    } else verify('P3');
+  }
+
+  /* ===== aceite: decisão sobre a falha ===== */
+  let parou = false;
+  if (V === 'aceite') {
+    st.fase = 'decisão: reação à falha'; st.lp.on = 'v';
+    const d2 = {
+      kind: 'decision', title: 'Você escolhe: o que o loop faz com a falha?', actors: ['voce'],
+      explain: `<p>O sinal existe, vem do ambiente e acusou. Isso ainda não fecha o ciclo: falta o agente <b>reagir ao resultado</b> ${M}. A seta que volta é a falha entrar no próximo <i>gather context</i> e mudar a próxima ação.</p>`,
+      data: { kind: 'json', title: 'Configuração do loop', obj: { verificador: 'aceite', reacao_a_falha: null }, hl: ['reacao_a_falha'] },
+      trans: ['Cada reação gera um caminho diferente a partir daqui.'],
+      decision: { id: 'reacao', prompt: 'O verificador acusou falha no P3. O loop…', options: [
+        { v: 'corrigir', l: 'Devolve o resultado ao contexto e corrige o rumo', s: 'o tool_result com a falha entra na próxima volta' },
+        { v: 'repetir', l: 'Descarta a saída e pede de novo', s: 'repetir às cegas: o harness desfaz a tentativa e reenvia o mesmo pedido' },
+        { v: 'ignorar', l: 'Registra como aviso e segue para publicar', s: 'o sinal existe, mas não muda nada' },
+      ] },
+    };
+    if (!decision(d2, (r) => {
+      st.reacao = r;
+      d2.data = { kind: 'json', title: 'Configuração do loop', obj: { verificador: 'aceite', reacao_a_falha: r, significa: REA[r] }, hl: ['reacao_a_falha'] };
+    })) return steps;
+
+    if (R === 'corrigir') {
+      st.tentativa = 2; st.seta += 1;
+      st.passo = 'P3'; st.fase = 'gather context'; st.volta += 1;
+      st.lp.on = 'g'; st.lp.rail = 'on';
+      st.crenca.P3 = { cls: 'bad', b: '✗ reprovado', s: 'a falha está no contexto' };
+      add({ kind: 'step', phase: 'g', passo: 'P3', title: 'P3 · gather context: a seta que volta', actors: ['harness', 'modelo'],
+        explain: `<p><b>Esta é a seta que volta.</b> O <code>tool_result</code> com a falha entra no contexto da volta seguinte, e o modelo passa a saber o que o mundo disse: <code>frete(200)</code> esperado 0, recebido 15 ${M}. Na doc: cada uso de ferramenta devolve informação que alimenta o loop e informa a próxima decisão ${D('hcw')}.</p><p class="note">Compare com a volta 3: a diferença entre os dois contextos é exatamente o sinal do ambiente.</p>`,
+        data: ctxView(`O que o modelo recebe na volta ${st.volta}`, 'Realce = entrou no contexto desde a volta anterior (o gather context da volta 3). ' + S),
+        trans: ['take action: agora com a falha à vista.'] });
+
+      st.fase = 'take action'; st.lp.on = 'a'; st.lp.rail = null;
+      const f1 = nid('EDT'), f2 = nid('EDT');
+      st.verdade.P3 = { cls: 'ok', b: 'ok', s: 'corrigido: total >= 200', inh: 'herdou: lacuna do P2' };
+      st.verdade.P2 = { cls: 'ok', b: 'ok', s: 'limite coberto na correção' };
+      st.defeito = null;
+      ctxSet('frete', 'arquivo', 'src/frete.js: ' + CODE.freteOk);
+      ctxSet('teste', 'arquivo', 'src/frete.test.js: 3 testes, agora com R$ 200 exatos');
+      st.lp.a = 'Edit src/frete.js · Edit src/frete.test.js';
+      add({ kind: 'step', phase: 'a', passo: 'P3', title: 'P3 · take action: corrigir o rumo (2ª tentativa)', actors: ['modelo', 'harness', 'ambiente'],
+        explain: `<p>O modelo lê a falha e corrige a causa. Volta para <code>&gt;=</code> e acrescenta o teste do limite, fechando também a lacuna do P2 ${S}. A correção não é garantida: é a leitura do resultado que a torna provável, e quem a confirma é o próximo <i>verify</i>, não a própria correção.</p>`,
+        data: { kind: 'json', title: 'take action: a correção', obj: [
+          { role: 'assistant', content: [
+            { type: 'tool_use', id: f1, name: 'Edit', input: { file_path: 'src/frete.js', old_string: 'acimaDe(total, 200)', new_string: 'total >= 200' } },
+            { type: 'tool_use', id: f2, name: 'Edit', input: { file_path: 'src/frete.test.js', old_string: "test('pedido grande", new_string: CODE.testeLimite + "\ntest('pedido grande" } },
+          ] },
+          { role: 'user', content: [
+            { type: 'tool_result', tool_use_id: f1, content: 'The file src/frete.js has been updated.' },
+            { type: 'tool_result', tool_use_id: f2, content: 'The file src/frete.test.js has been updated.' },
+          ] },
+        ], hl: ['id', 'tool_use_id', '~total >= 200', '~R$ 200,00 exatos'] },
+        trans: ['verify results: o mesmo critério roda de novo.'] });
+
+      verify('P3', {
+        tent: 2,
+        explain: `<p><code>3 passed</code>. É o ciclo que a doc descreve: fazer o trabalho, rodar o check, ler o resultado e iterar até passar ${D('bp')}. Na formulação da Anthropic, agentes iteram sobre a solução usando o resultado dos testes como feedback ${D('bea')}.</p>`,
+        trans: ['Passou: segue para o gather context do P4.'],
+      });
+    } else if (R === 'repetir') {
+      for (const t of [2, 3]) {
+        st.tentativa = t; st.setaVazia += 1;
+        st.passo = 'P3'; st.fase = 'gather context'; st.volta += 1;
+        st.lp.on = 'g'; st.lp.rail = 'vazia'; st.lp.exitCls = '';
+        st.verdade.P3 = { cls: 'empty', b: 'desfeito', s: 'tentativa revertida', inh: 'herdou: lacuna do P2' };
+        st.defeito = null;
+        ctxSet('frete', 'arquivo', 'src/frete.js: ' + CODE.freteOk);
+        ctxSet('checkout', 'arquivo', 'src/checkout.js: ' + CODE.checkout0 + ' (lido com Read)');
+        const vitem = st.ctx.find((c) => c.id === 'vP3');
+        if (vitem) { vitem.desc = true; vitem.fail = false; }
+        st.crenca.P3 = { cls: 'neutral', b: `⟳ ${t}ª tentativa`, s: 'sem o resultado anterior' };
+        add({ kind: 'step', phase: 'g', passo: 'P3', title: `P3 · gather context: a seta volta vazia (${t}ª tentativa)`, actors: ['harness', 'modelo'],
+          explain: t === 2
+            ? `<p>O loop volta, mas <b>sem nada</b>. O harness desfez a tentativa e descartou a saída do verificador, então o contexto desta volta é igual ao da volta 3 ${S}. A seta do palco está tracejada: ela dispara, mas não carrega informação.</p>`
+            : `<p>Mais uma volta vazia. O contexto é o mesmo das voltas anteriores. O que mudou foi só o contador de tentativas.</p>`,
+          data: ctxView(`O que o modelo recebe na volta ${st.volta}`, 'Riscado = descartado pelo harness: o modelo não vê. ' + S),
+          trans: ['take action: com o mesmo contexto de antes.'] });
+        p3action(t);
+        verify('P3', {
+          tent: t,
+          explain: t === 2
+            ? `<p>Falhou de novo, com a mesma mensagem. O verificador continua certo, mas a informação não chega a quem precisa dela.</p>`
+            : `<p>Terceira falha idêntica. O loop bate no limite de tentativas.</p>`,
+          trans: [t === 2 ? 'Falhou: sem a saída, o loop repete mais uma vez.' : 'Falhou: limite de 3 tentativas atingido.'],
+        });
+      }
+      parou = true;
+      st.fase = 'parado'; st.lp.on = 'x'; st.lp.rail = null;
+      st.lp.exit = 'limite de tentativas: parou sem publicar'; st.lp.exitCls = 'mid';
+      st.verdade.P4 = { cls: 'empty', b: 'não publicado', s: 'nada chegou ao cliente' };
+      st.publicado = 'não: parou antes';
+      st.desfecho = 'parado';
+      addEnd('aceite|repetir');
+    } else if (R === 'ignorar') {
+      st.fase = 'falha ignorada'; st.lp.on = 'x'; st.lp.exit = 'segue para o P4 (falha ignorada)'; st.lp.exitCls = 'mid';
+      st.crenca.P3 = { cls: 'warn', b: '⚠ aviso', s: '1 failed: ignorado' };
+      add({ kind: 'step', phase: 'x', passo: 'P3', title: 'P3 · a falha vira aviso', actors: ['harness'],
+        explain: `<p>O loop registra “aviso: 1 teste falhou” e segue. O sinal existiu e acertou, mas o agente não reagiu. Fechar o ciclo é ligar o build e os testes ao loop <b>e fazer o agente reagir ao resultado</b> ${M}. A saída do verificador está no contexto, mas nada nela muda a próxima ação.</p>`,
+        data: { kind: 'json', title: 'O que o harness registra', obj: { aviso: '1 teste falhou: frete(200) → esperado 0, recebido 15', acao: 'seguir para o P4' }, hl: ['acao'] },
+        trans: ['Segue para o gather context do P4, com o defeito no ambiente.'] });
+    }
+  }
+
+  if (parou) return steps;
+
+  /* ===== P4 ===== */
+  st.tentativa = 1;
+  const herdaBug = bug();
+  if (herdaBug) st.herdaram += 1;
+  st.verdade.P4 = { cls: 'empty', b: '·', s: 'ainda não publicado', inh: herdaBug ? 'herdou: bug do P3' : '' };
+  const crencaP3 = { nenhum: 'assumido como bom, sem conferência nenhuma', autorrelato: 'aprovado pelo próprio modelo (96%)', linter: 'aprovado pelo lint', testes_modelo: 'aprovado por 2 testes verdes', aceite: R === 'ignorar' ? 'com uma falha conhecida, marcada como aviso' : 'aprovado pelos casos da spec, depois de uma correção' }[V];
+  gather('P4', 'P4 · gather context: a última premissa',
+    herdaBug
+      ? `<p>Volta ${st.volta}. O P3 chega aqui ${crencaP3}. Ele vira premissa do passo final: cada elo trata a saída do anterior como premissa boa ${M}.</p>` + (R === 'ignorar' ? `<p>Neste caminho a premissa é ruim <i>e o sistema sabe disso</i>. A informação existe, mas não governa a ação.</p>` : '')
+      : `<p>Volta ${st.volta}. O P3 chega aqui ${crencaP3}. A premissa do passo final é boa, e há evidência disso vinda do ambiente, não do modelo.</p>`);
+
+  st.fase = 'take action'; st.lp.on = 'a';
+  const dp = nid('DPL');
+  st.verdade.P4 = herdaBug
+    ? { cls: 'bad', b: 'bug em produção', s: 'R$ 200,00 paga R$ 15', inh: 'herdou: bug do P3' }
+    : { cls: 'ok', b: 'ok em produção', s: 'regra da spec publicada' };
+  st.publicado = 'sim: produção v1.4.0';
+  ctxSet('deploy', 'result', `tool_result ${dp}: deploy → produção v1.4.0`);
+  st.lp.a = 'Bash npm run deploy';
+  semVer('P4');
+  if (V === 'nenhum') st.lp.exit = 'fim do turno: end_turn';
+  add({ kind: 'step', phase: 'a', passo: 'P4', title: 'P4 · take action: publicar', actors: ['modelo', 'harness', 'ambiente'],
+    explain: herdaBug
+      ? `<p><b>O passo 4 publica o conjunto</b> ${M}: o bug do P3, protegido pela lacuna do P2, agora está em produção. O erro não desapareceu. <b>Compôs</b> ${M}.</p>`
+      : `<p>Publica um conjunto que passou pelos casos da spec, incluindo o limite de R$ 200.</p>`,
+    data: { kind: 'json', title: 'take action: o pedido do modelo e a resposta do harness', obj: [
+      { role: 'assistant', content: [{ type: 'tool_use', id: dp, name: 'Bash', input: { command: 'npm run deploy' } }] },
+      { role: 'user', content: [{ type: 'tool_result', tool_use_id: dp, content: OUT.deploy.join('\n') }] },
+    ], hl: ['id', 'tool_use_id', '~produção v1.4.0'], term: { cmd: 'npm run deploy', lines: OUT.deploy } },
+    trans: afterAction('P4') });
+
+  if (V === 'nenhum') {
+    st.fase = 'fim do turno'; st.lp.on = 'x'; st.lp.exit = '“tarefa completa” (end_turn)'; st.lp.exitCls = 'mid';
+    add({ kind: 'step', phase: 'x', passo: 'P4', title: 'P4 · end_turn: “parece pronto”', actors: ['modelo'],
+      explain: `<p>O modelo encerra o turno com <code>stop_reason: "end_turn"</code>. É onde termina o esqueleto do Módulo 0: “repetir até end_turn” ${M}. Nada nele conferiu o que foi feito. A doc descreve o efeito: Claude para quando o trabalho <i>parece</i> pronto, e sem um check executável, “parece pronto” é o único sinal disponível ${D('bp')}.</p>`,
+      data: { kind: 'json', title: 'A última resposta do modelo', obj: { role: 'assistant', stop_reason: 'end_turn', content: [{ type: 'text', text: 'Pronto: frete grátis implementado, testado e publicado.' }] }, hl: ['stop_reason', 'text'], cap: 'Texto: ' + S },
+      trans: ['O loop acabou. O ambiente ainda não deu o veredito final.'] });
+  } else if (V === 'aceite') {
+    verify('P4', {
+      explain: R === 'ignorar'
+        ? `<p>O mesmo caso falha de novo, agora contra a produção, e de novo vira aviso. O sinal acertou duas vezes e não mudou nenhuma ação. Sem reação, não há seta ${M}.</p>`
+        : `<p>Os casos da spec rodam contra a versão publicada e passam. <b>Passou → tarefa completa</b>, agora com uma evidência que não veio do modelo ${M}.</p>`,
+      trans: [R === 'ignorar' ? 'Falha registrada como aviso: tarefa declarada completa.' : 'Passou: tarefa completa.'],
+    });
+    if (R === 'ignorar') { st.crenca.P4 = { cls: 'warn', b: '⚠ aviso', s: '1 failed: ignorado de novo' }; st.lp.exit = '“tarefa completa” (com aviso)'; st.lp.exitCls = 'mid'; st.lp.on = 'v'; steps[steps.length - 1].state = clone(st); }
+  } else {
+    verify('P4');
+    st.lp.exitCls = 'mid'; st.lp.exit = 'tarefa completa (declarada)';
+    steps[steps.length - 1].state = clone(st);
+  }
+
+  /* ===== consequência e resultado ===== */
+  const key = V === 'aceite' ? 'aceite|' + R : V;
+  if (herdaBug) {
+    st.fase = 'produção'; st.lp.on = 'x'; st.passo = 'P4';
+    st.lp.exit = '“completa”, e o cliente achou o bug'; st.lp.exitCls = 'bad';
+    st.verdade.P4 = { cls: 'bad', b: 'bug em produção', s: 'cliente reclamou: ticket #4812', inh: 'herdou: bug do P3' };
+    if (!st.detectado) st.detectado = 'produção, pelo cliente';
+    add({ kind: 'step', phase: 'x', passo: 'P4', title: 'Produção: o ambiente responde, fora do loop', actors: ['cliente'],
+      explain: `<p>Um cliente com carrinho de exatamente R$ 200,00 paga R$ 15,00 de frete ${S}. O ambiente sempre dá o veredito. A questão é <b>quando</b> e <b>para quem</b>. Sem a seta, ele chega depois de publicado, e quem o recebe é você: “you become the verification loop” ${D('bp')}.</p>` +
+        (R === 'ignorar' ? `<p>Neste caminho, o loop já sabia desde a volta 3.</p>` : ''),
+      data: { kind: 'json', title: 'O sinal que chegou tarde', obj: { ticket: '#4812', carrinho: 200.00, frete_cobrado: 15, frete_esperado: 0, origem_do_erro: 'P3: acimaDe(total, 200)', por_que_passou: V === 'nenhum' ? 'não havia verificação' : VER[V].mede + (R === 'ignorar' ? ' (acusou e foi ignorado)' : '') }, hl: ['frete_cobrado', 'por_que_passou'], cap: 'Ticket inventado: ' + S },
+      trans: ['Próxima etapa: o resultado do caminho.'] });
+  }
+  st.desfecho = herdaBug ? 'defeito publicado' : 'completa';
+  addEnd(key);
+  return steps;
+
+  function addEnd(k) {
+    const r = RES[k];
+    st.fase = 'resultado'; st.lp.on = 'x';
+    add({ kind: 'end', phase: 'x', passo: st.passo, title: 'Resultado do caminho', actors: ['none'], ok: r.ok, key: k,
+      explain: `<p>${r.p}</p>`,
+      data: { kind: 'json', title: 'Resumo do caminho', obj: {
+        verificador: VER[V].rot, sinal_vem_de: VER[V].fonte, mede: VER[V].mede,
+        reacao_a_falha: st.reacao ? REA[st.reacao] : null,
+        desfecho: st.desfecho, erro_apareceu_em: st.detectado || 'em lugar nenhum',
+        voltas_do_loop: st.volta, seta_com_informacao: st.seta, seta_vazia: st.setaVazia,
+        passos_que_herdaram_defeito: st.herdaram, confianca_declarada: st.confianca,
+      }, hl: ['desfecho', 'erro_apareceu_em', 'seta_com_informacao'] },
+      trans: ['Volte à etapa ◆ e troque a escolha: o caminho é reconstruído a partir dela.', 'Veja a linha deste caminho na Comparação dos desfechos.'] });
+  }
+}
+
+const RES = {
+  nenhum: { ok: 'bad', h: 'linha reta, e o erro compôs até a produção', p: `Nenhuma volta conferiu nada. O erro do passo 3, protegido pela lacuna do passo 2, chegou ao cliente. Sem a seta, o desenho é uma linha reta de prompts encadeados, e linha reta não corrige rumo ${M}.` },
+  autorrelato: { ok: 'bad', h: 'confiança de 97%, conferência nenhuma', p: `O loop tinha um passo chamado “verificação”, mas o sinal vinha do próprio modelo. Auto-relato não é verificação, e confiança declarada não é acurácia ${M}.` },
+  linter: { ok: 'bad', h: 'verde em toda volta, defeito em produção', p: `Havia sinal do ambiente, mas da propriedade errada. Verificação que mede a coisa errada dá falsa confiança, pior que a ausência declarada ${M}. No cenário de prova, a resposta é trocar o critério: ligar build e testes ao loop ${M}.` },
+  testes_modelo: { ok: 'bad', h: '“todos os testes passaram”, e o bug foi publicado', p: `O veredito vinha do ambiente, mas o critério vinha do mesmo modelo que errou. Os testes não testavam o que importa, e nada acusou ${M}.` },
+  'aceite|corrigir': { ok: 'ok', h: 'tarefa completa, com evidência', p: `O erro nasceu no passo 3 e morreu no passo 3, com uma volta a mais da seta. O sinal veio do ambiente, mediu a regra pedida e voltou para o contexto. É isso que faz do loop um agente ${M}.` },
+  'aceite|repetir': { ok: 'mid', h: 'nada publicado, tarefa não concluída', p: `O verificador funcionou como portão e segurou a publicação. Mas a falha não entrou no contexto, então as novas tentativas não tinham por que sair diferentes ${S}. Sem informação nova, repetir não corrige. O limite de tentativas só impede o loop de girar para sempre ${D('bea')}.` },
+  'aceite|ignorar': { ok: 'bad', h: 'publicado com um defeito conhecido', p: `O sinal existia, era do ambiente, media o que importa e acusou duas vezes. Faltou o agente reagir ao resultado, que é o que fecha o ciclo ${M}.` },
+};
+
+const COMBOS = [
+  { key: 'nenhum', dec: { verificador: 'nenhum' } },
+  { key: 'autorrelato', dec: { verificador: 'autorrelato' } },
+  { key: 'linter', dec: { verificador: 'linter' } },
+  { key: 'testes_modelo', dec: { verificador: 'testes_modelo' } },
+  { key: 'aceite|corrigir', dec: { verificador: 'aceite', reacao: 'corrigir' } },
+  { key: 'aceite|repetir', dec: { verificador: 'aceite', reacao: 'repetir' } },
+  { key: 'aceite|ignorar', dec: { verificador: 'aceite', reacao: 'ignorar' } },
+];
+
+/* ---------- motor ---------- */
+let decisions = {};
+let path = [];
+let cur = 0, playing = false, timer = null, speed = 1;
+const BASE_MS = 2200;
+const visited = new Set();
+let revealAll = false;
+
+function choose(step, value) {
+  for (const s of path) if (s.kind === 'decision' && s.index > step.index) delete decisions[s.decision.id];
+  decisions[step.decision.id] = value;
+  path = buildPath(decisions);
+  cur = step.index;
+  renderAll();
+}
+const unresolved = (s) => s.kind === 'decision' && decisions[s.decision.id] === undefined;
+function tick() {
+  if (unresolved(path[cur]) || cur >= path.length - 1) { pause(); return; }
+  cur++; renderAll();
+  if (unresolved(path[cur]) || cur >= path.length - 1) pause();
+}
+function play() { if (playing) return; if (unresolved(path[cur]) || cur >= path.length - 1) return; playing = true; timer = setInterval(tick, BASE_MS / speed); renderControls(); }
+function pause() { playing = false; clearInterval(timer); timer = null; renderControls(); }
+function next() { if (!unresolved(path[cur]) && cur < path.length - 1) { cur++; renderAll(); } }
+function prev() { if (cur > 0) { cur--; renderAll(); } }
+function goto(i) { if (i >= 0 && i < path.length) { cur = i; renderAll(); } }
+function reset() { playing = false; clearInterval(timer); timer = null; decisions = {}; path = buildPath(decisions); cur = 0; renderAll(); }
+function setSpeed(v) { speed = v; if (playing) { pause(); play(); } }
+
+/* ---------- render ---------- */
+const $ = (id) => document.getElementById(id);
+const ACT = {
+  harness: ['a-app', 'harness (Claude Code)'], modelo: ['a-api', 'modelo'], ambiente: ['a-tools', 'ambiente'],
+  voce: ['a-voce', 'você'], cliente: ['a-cli', 'cliente'], none: ['a-none', 'visão geral'],
+};
+
+function renderAll() {
+  const s = path[cur];
+  if (s.kind === 'end') visited.add(s.key);
+  renderControls(); renderTimeline(); renderChips();
+  renderStage(s); renderStep(s); renderData(s); renderState(s); renderTrans(s); renderCmp(s);
+}
+
+function renderControls() {
+  const s = path[cur];
+  const blocked = unresolved(s) || cur >= path.length - 1;
+  $('b-play').textContent = playing ? '⏸ Pausar' : '▶ Play';
+  $('b-play').disabled = !playing && blocked;
+  $('b-prev').disabled = cur === 0;
+  $('b-next').disabled = blocked;
+  const pend = path.some(unresolved);
+  $('progress').textContent = `Etapa ${cur} de ${path.length - 1}` + (pend ? ' · o total cresce depois da decisão' : '');
+}
+
+function renderTimeline() {
+  const tl = $('timeline');
+  tl.innerHTML = '';
+  path.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    let c = 'tl';
+    if (s.kind === 'decision') c += ' dec' + (unresolved(s) ? ' open' : '');
+    if (s.kind === 'end') c += ' end ' + (s.ok || '');
+    if (s.fail) c += ' fail';
+    if (i < cur) c += ' past';
+    if (i === cur) c += ' cur';
+    b.className = c;
+    b.title = `Etapa ${i}: ${s.title}`;
+    b.setAttribute('aria-label', b.title);
+    b.addEventListener('click', () => { pause(); goto(i); });
+    tl.appendChild(b);
+  });
+  if (path.some(unresolved)) {
+    const m = document.createElement('span');
+    m.className = 'tl-more';
+    m.textContent = '… decida para continuar';
+    tl.appendChild(m);
+  }
+}
+
+function renderChips() {
+  const el = $('chips');
+  const decs = path.filter((s) => s.kind === 'decision' && !unresolved(s));
+  if (!decs.length) { el.innerHTML = '<span>Nenhuma decisão tomada ainda.</span>'; return; }
+  el.innerHTML = '<span>Decisões:</span>';
+  for (const s of decs) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip-dec';
+    const v = decisions[s.decision.id];
+    const lbl = s.decision.id === 'verificador' ? VER[v].rot : REA[v];
+    b.innerHTML = `${s.decision.id === 'verificador' ? 'verificador' : 'reação à falha'}: <b>${esc(lbl)}</b> (etapa ${s.index})`;
+    b.title = 'Ir para a decisão e trocá-la';
+    b.addEventListener('click', () => { pause(); goto(s.index); });
+    el.appendChild(b);
+  }
+}
+
+function renderStage(s) {
+  const st = s.state, L = st.lp, v = st.verificador;
+  $('where').innerHTML = st.passo
+    ? `Passo <b>${st.passo} · ${NOME[st.passo]}</b> · volta ${st.volta}${st.tentativa > 1 ? ` · ${st.tentativa}ª tentativa` : ''}`
+    : '<b>Antes da primeira volta</b>';
+
+  const vcls = !v ? 'pending' : v === 'nenhum' ? 'absent' : v === 'autorrelato' ? 'self' : 'env';
+  const vsmall = !v ? 'o verificador é você quem escolhe' : v === 'nenhum' ? 'ausente: a ação segue direto' : `fonte: ${esc(VER[v].fonte)} · mede: ${esc(VER[v].mede)}`;
+  const on = (k) => (L.on === k ? ' on' : '');
+  const railCls = v === 'nenhum' ? 'none' : (L.rail || '');
+  const railTxt = v === 'nenhum'
+    ? '<span>sem seta: linha reta</span>'
+    : `<span><b>${L.rail === 'vazia' ? 'voltou vazia' : 'falhou:'}</b>${L.rail === 'vazia' ? 'sem a saída do verificador' : 'corrigir o rumo e repetir'}<br>${st.seta}× com informação${st.setaVazia ? `<br>${st.setaVazia}× vazia` : ''}</span>`;
+  $('loop').innerHTML = `
+    <div class="cycle">
+      <div class="cyc-nodes">
+        <div class="node n-gather${on('g')}"><b>gather context</b><small>histórico, arquivos, tool_results anteriores</small><span class="nsub">${st.ctx.filter((c) => !c.desc).length} itens no contexto</span></div>
+        <div class="conn">↓</div>
+        <div class="node n-action${on('a')}"><b>take action</b><small>tool_use: editar, rodar, buscar; o harness executa</small><span class="nsub">${esc(L.a || '')}</span></div>
+        <div class="conn">↓</div>
+        <div class="node n-verify ${vcls}${on('v')}"><b>verify results</b><small>${vsmall}</small><span class="nsub ${L.vres || ''}">${esc(L.v || '')}</span></div>
+      </div>
+      <div class="rail ${railCls}" aria-label="Seta que volta">${railTxt}</div>
+    </div>
+    <div class="conn${v === 'nenhum' ? ' skip' : ''}">${v === 'nenhum' ? '↓ segue direto' : L.vres === 'fail' ? '✗ não passou: nada segue' : '↓ passou'}</div>
+    <div class="node n-exit ${L.exitCls}${on('x')}"><b>${esc(L.exit)}</b></div>`;
+
+  const prevSt = cur > 0 ? path[cur - 1].state : null;
+  const ck = checks(st), pk = prevSt ? checks(prevSt) : null;
+  $('checks').innerHTML = ck.map((c, i) => `<li class="${c[0]}${pk && (pk[i][0] !== c[0] || pk[i][2] !== c[2]) ? ' chg' : ''}"><span class="lamp" aria-hidden="true"></span><span>${c[1]}<small>${c[0] === 'ok' ? 'sim' : c[0] === 'no' ? 'não' : 'indefinido'}: ${c[2]}</small></span></li>`).join('');
+
+  const debt = $('debt');
+  debt.innerHTML = `Passos que herdaram defeito: <b class="${st.herdaram ? '' : 'zero'}">${st.herdaram}</b>`;
+
+  const P = ['P1', 'P2', 'P3', 'P4'];
+  const cell = (o, po, extraCls) => {
+    const chg = prevSt && JSON.stringify(o) !== JSON.stringify(po) ? ' chg' : '';
+    if (!o) return `<div class="cell empty${extraCls || ''}${chg}">·</div>`;
+    return `<div class="cell ${o.cls}${extraCls || ''}${chg}"><b>${esc(o.b)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}${o.inh ? `<span class="inh">${esc(o.inh)}</span>` : ''}</div>`;
+  };
+  let h = P.map((p) => `<div class="bcol${st.passo === p ? ' cur' : ''}">${CURTO[p]}</div>`).join('');
+  h += '<div class="brow">O que o loop acredita <small>(é o que está no contexto)</small></div>';
+  h += P.map((p) => cell(st.crenca[p], prevSt && prevSt.crenca[p])).join('');
+  h += '<div class="brow">Sinal: a ponte entre verdade e crença <small>(▲ do ambiente · ↺ do próprio modelo)</small></div>';
+  h += P.map((p) => cell(st.sinal[p], prevSt && prevSt.sinal[p], ' sig')).join('');
+  h += '<div class="brow">Verdade do ambiente <small>(só você vê)</small></div>';
+  h += P.map((p) => cell(st.verdade[p], prevSt && prevSt.verdade[p])).join('');
+  $('board').innerHTML = h;
+}
+
+function checks(st) {
+  const v = st.verificador, r = st.reacao;
+  const L1 = 'Traz um sinal do <b>ambiente</b>, não do modelo';
+  const L2 = 'Mede a propriedade <b>que importa</b>: a regra, com o limite';
+  const L3 = 'O loop <b>reage</b>: a falha volta ao contexto e muda a ação';
+  if (!v) return [['na', L1, 'escolha um verificador'], ['na', L2, 'escolha um verificador'], ['na', L3, 'escolha um verificador']];
+  const c1 = v === 'nenhum' ? ['no', L1, 'não há sinal'] : v === 'autorrelato' ? ['no', L1, 'vem do próprio modelo'] : v === 'testes_modelo' ? ['ok', L1, 'o veredito vem do ambiente, mas o critério foi escrito pelo modelo'] : ['ok', L1, 'o ambiente responde'];
+  const c2 = { nenhum: ['no', L2, 'nada é medido'], autorrelato: ['no', L2, 'mede a opinião do modelo'], linter: ['no', L2, 'mede estilo'], testes_modelo: ['no', L2, 'mede 50 e 500, não o limite'], aceite: ['ok', L2, 'casos da spec, com R$ 200 exatos'] }[v];
+  let c3;
+  if (v === 'nenhum') c3 = ['no', L3, 'não existe seta'];
+  else if (v !== 'aceite') c3 = ['na', L3, 'nunca posto à prova: este sinal não acusa o bug'];
+  else if (!r) c3 = ['na', L3, st.sinal.P3 && st.sinal.P3.cls === 'bad' ? 'a falha chegou; falta decidir a reação' : 'ainda não houve falha'];
+  else c3 = { corrigir: ['ok', L3, 'a falha entrou no contexto e mudou a ação'], repetir: ['no', L3, 'o loop volta, mas sem a informação'], ignorar: ['no', L3, 'a falha não mudou nada'] }[r];
+  return [c1, c2, c3];
+}
+
+function renderStep(s) {
+  const acts = (s.actors || []).map((a) => `<span class="actor ${ACT[a][0]}">${ACT[a][1]}</span>`).join('');
+  const ph = { g: 'gather context', a: 'take action', v: 'verify results', x: s.kind === 'end' ? 'resultado' : 'fim do ciclo' }[s.phase] || '';
+  $('stephead').innerHTML = `<span class="stepno">Etapa ${s.index}</span>${ph ? `<span>· ${ph}</span>` : ''}${s.kind === 'decision' ? '<span class="flag-dec">◆ decisão</span>' : ''}<span>· quem age:</span>${acts}`;
+  $('steptitle').textContent = s.title;
+  let ex = s.explain || '';
+  if (s.kind === 'end') {
+    const r = RES[s.key], st = s.state;
+    ex = `<div class="verdict ${r.ok}"><b class="h">${esc(r.h.charAt(0).toUpperCase() + r.h.slice(1))}</b>${r.p}</div>
+      <div class="metrics">
+        <div class="metric"><span>defeito publicado?</span><b>${st.desfecho === 'defeito publicado' ? 'sim' : 'não'}</b></div>
+        <div class="metric"><span>o erro apareceu em</span><b>${esc(st.detectado || '—')}</b></div>
+        <div class="metric"><span>seta com informação</span><b>${st.seta}×</b></div>
+        <div class="metric"><span>passos que herdaram defeito</span><b>${st.herdaram}</b></div>
+        <div class="metric"><span>voltas do loop</span><b>${st.volta}</b></div>
+        <div class="metric"><span>confiança declarada</span><b>${esc(st.confianca || '—')}</b></div>
+      </div>`;
+  }
+  $('explain').innerHTML = ex;
+  const d = $('decision');
+  if (s.kind !== 'decision') { d.innerHTML = ''; return; }
+  const val = decisions[s.decision.id];
+  d.innerHTML = `<div class="decision"><div class="dprompt">${s.decision.prompt}</div><div class="dopts"></div>${val === undefined ? '<p class="dwait">⏸ A simulação espera sua escolha.</p>' : `<p class="dok">Escolhido. Trocar a opção reconstrói o caminho a partir daqui e apaga as decisões seguintes.</p>`}</div>`;
+  const box = d.querySelector('.dopts');
+  for (const o of s.decision.options) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'opt' + (val === o.v ? ' sel' : '');
+    b.innerHTML = `${o.l}<small>${o.s}</small>`;
+    b.dataset.v = o.v;
+    b.addEventListener('click', () => { pause(); choose(s, o.v); });
+    box.appendChild(b);
+  }
+}
+
+function jsonHtml(obj, hl) {
+  const lines = JSON.stringify(obj, null, 2).split('\n');
+  const colorVal = (v) => {
+    let m = v.match(/^("(?:[^"\\]|\\.)*")(,?)$/);
+    if (m) return `<span class="s">${esc(m[1])}</span>${m[2]}`;
+    m = v.match(/^(-?\d[\d.]*|true|false|null)(,?)$/);
+    if (m) return `<span class="n">${m[1]}</span>${m[2]}`;
+    return esc(v);
+  };
+  return lines.map((line) => {
+    const m = line.match(/^(\s*)("(?:[^"\\]|\\.)*")(:\s)(.*)$/);
+    const key = m ? JSON.parse(m[2]) : null;
+    const val = m ? m[4] : line.trim();
+    let on = false;
+    for (const h of hl || []) {
+      if (h.startsWith('~')) { if (line.includes(h.slice(1))) on = true; }
+      else if (key === h && !/^[\[{]/.test(val)) on = true;
+    }
+    const body = m ? `${m[1]}<span class="k">${esc(m[2])}</span>${m[3]}${colorVal(m[4])}` : line.replace(/^(\s*)(.*)$/, (_, a, b) => a + colorVal(b));
+    return `<span class="jl${on ? ' hl' : ''}">${body}</span>`;
+  }).join('');
+}
+
+function renderData(s) {
+  const d = s.data, el = $('data');
+  if (!d) { el.innerHTML = '<p class="none">Sem dados nesta etapa.</p>'; return; }
+  let h = `<div class="data-title">${d.title}</div>`;
+  if (d.kind === 'ctx') {
+    h += '<div class="ctx">' + d.ctx.map((c) => {
+      const tl = { pedido: 'pedido', arquivo: 'arquivo', result: 'tool_result', texto: 'texto do modelo' }[c.t];
+      const isNew = d.novos.includes(c.id);
+      return `<div class="ci ${c.t}${isNew && !c.desc ? ' novo' : ''}${c.desc ? ' desc' : ''}${c.fail ? ' fail' : ''}"><span class="ct">${tl}</span><span class="txt">${esc(c.txt)}</span>${c.desc ? '<span class="nw">descartado: o modelo não vê</span>' : isNew ? '<span class="nw">novo nesta volta</span>' : ''}</div>`;
+    }).join('') + '</div>';
+  } else {
+    h += `<pre class="json">${jsonHtml(d.obj, d.hl)}</pre>`;
+    if (d.term) {
+      h += `<p class="term-t">Como a saída aparece no terminal (ilustrativo):</p><div class="term"><span class="cmd">$ ${esc(d.term.cmd)}</span>\n` + d.term.lines.map((l) => `<span class="${l.startsWith('✕') || /failed/.test(l) ? 'fail' : l.startsWith('✓') || /passed|0 problems/.test(l) ? 'ok' : 'dim'}">${esc(l)}</span>`).join('\n') + '</div>';
+    }
+  }
+  const capDefault = /tool_use/.test(JSON.stringify(d.obj || '')) ? `Nomes <code>Write</code>/<code>Edit</code>/<code>Bash</code> e os campos <code>command</code>, <code>old_string</code>, <code>new_string</code>: ${D('tools')}. Forma <code>tool_use</code>/<code>tool_result</code> com <code>tool_use_id</code> = <code>id</code>: Módulo 0. Ids, conteúdos e saídas: ${S}` : '';
+  const cap = d.cap || capDefault;
+  if (cap) h += `<p class="data-cap">${cap}</p>`;
+  el.innerHTML = h;
+}
+
+function stateRows(st) {
+  return [
+    ['Passo atual', st.passo ? `${st.passo} · ${NOME[st.passo]}` : '—'],
+    ['Fase', st.fase],
+    ['Volta do loop', st.volta || '—'],
+    ['Tentativa no passo', st.passo ? st.tentativa + 'ª' : '—'],
+    ['Verificador', st.verificador ? VER[st.verificador].rot : 'a escolher'],
+    ['Sinal vem de', st.verificador ? VER[st.verificador].fonte : '—'],
+    ['O sinal mede', st.verificador ? VER[st.verificador].mede : '—'],
+    ['Reação à falha', st.reacao ? REA[st.reacao] : '—'],
+    ['Seta que volta com informação', st.seta + '×'],
+    ['Seta que volta vazia', st.setaVazia + '×'],
+    ['Itens no contexto do modelo', String(st.ctx.filter((c) => !c.desc).length)],
+    ['Defeito no ambiente agora', st.defeito || 'nenhum'],
+    ['Passos que herdaram defeito', String(st.herdaram)],
+    ['Erro detectado em', st.detectado || '—'],
+    ['Publicado', st.publicado || 'não'],
+    ['Confiança declarada pelo modelo', st.confianca || '—'],
+  ];
+}
+function renderState(s) {
+  const rows = stateRows(s.state);
+  const pr = cur > 0 ? stateRows(path[cur - 1].state) : null;
+  $('state').innerHTML = rows.map((r, i) => `<tr><th>${r[0]}</th><td class="${pr && String(pr[i][1]) !== String(r[1]) ? 'chg' : ''}">${esc(r[1])}</td></tr>`).join('');
+}
+
+function renderTrans(s) {
+  const t = unresolved(s) ? ['Escolha uma opção acima: o avanço automático fica parado até lá.'] : (s.trans || []);
+  $('trans').innerHTML = t.map((x) => `<li>${x}</li>`).join('');
+}
+
+const FINALS = {};
+function finalOf(k) {
+  if (!FINALS[k]) { const c = COMBOS.find((x) => x.key === k); const p = buildPath(c.dec); FINALS[k] = p[p.length - 1].state; }
+  return FINALS[k];
+}
+function renderCmp(s) {
+  const st = s.state;
+  const curKey = st.verificador ? (st.verificador === 'aceite' ? (st.reacao ? 'aceite|' + st.reacao : null) : st.verificador) : null;
+  let h = '<tr><th>Caminho</th><th>Sinal vem de</th><th>Mede</th><th>Acusou o bug do P3?</th><th>Desfecho</th><th>O erro apareceu em</th><th>Herdaram defeito</th><th>Voltas</th></tr>';
+  for (const c of COMBOS) {
+    const show = revealAll || visited.has(c.key);
+    const v = c.dec.verificador;
+    const name = VER[v].rot + (c.dec.reacao ? ` → ${REA[c.dec.reacao]}` : '');
+    if (!show) { h += `<tr class="${curKey === c.key ? 'cur' : ''}"><td>${esc(name)}</td><td class="hidden" colspan="7">percorra este caminho até o fim para revelar</td></tr>`; continue; }
+    const f = finalOf(c.key);
+    const r = RES[c.key];
+    const acusou = f.detectado && f.detectado.startsWith('P3') ? 'sim, na 1ª tentativa' : 'não';
+    h += `<tr class="${curKey === c.key ? 'cur' : ''}"><td>${esc(name)}</td><td>${esc(VER[v].fonte)}</td><td>${esc(VER[v].mede)}</td><td>${acusou}</td><td><span class="pill ${r.ok}">${esc(f.desfecho)}</span></td><td>${esc(f.detectado || '—')}</td><td>${f.herdaram}</td><td>${f.volta}</td></tr>`;
+  }
+  $('cmp').innerHTML = h;
+  $('b-reveal').textContent = revealAll ? 'Mostrar só os percorridos' : 'Revelar todos';
+}
+
+/* ---------- eventos ---------- */
+$('b-play').addEventListener('click', () => (playing ? pause() : play()));
+$('b-next').addEventListener('click', () => { pause(); next(); });
+$('b-prev').addEventListener('click', () => { pause(); prev(); });
+$('b-reset').addEventListener('click', reset);
+$('speed').addEventListener('change', (e) => setSpeed(parseFloat(e.target.value)));
+$('b-reveal').addEventListener('click', () => { revealAll = !revealAll; renderCmp(path[cur]); });
+document.addEventListener('keydown', (e) => {
+  const tag = (e.target && e.target.tagName) || '';
+  if (/INPUT|SELECT|TEXTAREA/.test(tag)) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); pause(); next(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); pause(); prev(); }
+  else if (e.key === ' ' && tag !== 'BUTTON') { e.preventDefault(); playing ? pause() : play(); }
+});
+
+window.__sim = {
+  get cur() { return cur; },
+  get playing() { return playing; },
+  path: () => path,
+  decisions: () => clone(decisions),
+  goto, choose: (i, v) => choose(path[i], v), play, pause, next, prev, reset,
+  build: (d) => buildPath(d),
+};
+
+reset();
+</script>
+</body>
+</html>

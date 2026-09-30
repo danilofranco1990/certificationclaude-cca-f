@@ -6,3 +6,7 @@ dist/
 
 # HTML gerado por `npm run build` — o markdown é a fonte de verdade
 site/
+
+# lixo local e página de terceiros salva do navegador
+*.stackdump
+docs/Claude, arquiteto certificado.*
